@@ -9,7 +9,7 @@ crons = ["*/30 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "wid-db"
-database_id = "<your-d1-database-id>"
+database_id = "2d360f65-466a-43a4-bfd6-b54ae9b11306"
 
 [[vectorize]]
 binding = "VECTORIZE"
