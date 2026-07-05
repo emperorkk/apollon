@@ -6,6 +6,7 @@ import graph from './api/graph.js';
 import map from './api/map.js';
 import search from './api/search.js';
 import topics from './api/topics.js';
+import regions from './api/regions.js';
 import auth from './api/auth.js';
 import push from './api/push.js';
 import adminTopics from './api/admin/topics.js';
@@ -22,6 +23,7 @@ app.route('/api/articles', graph); // /api/articles/:id/graph
 app.route('/api/map', map);
 app.route('/api/search', search);
 app.route('/api/topics', topics);
+app.route('/api/regions', regions);
 app.route('/api/auth', auth);
 app.route('/api/push', push);
 app.route('/api/admin/topics', adminTopics);
