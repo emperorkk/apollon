@@ -1,0 +1,12 @@
+export const SIMILARITY_THRESHOLD = 0.85;
+export const RELATION_WINDOW_DAYS = 30;
+export const DEFAULT_FEED_DAYS = 5;
+export const MAX_FEED_DAYS = 30;
+export const GRAPH_MAX_NODES = 50;
+export const GRAPH_MAX_HOPS = 2;
+export const JWT_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days
+export const NOMINATIM_USER_AGENT = 'WorldIntelligenceDashboard/1.0 (contact@yourdomain.com)';
+export const NOMINATIM_DELAY_MS = 1100;
+export const OPENAI_CHAT_MODEL = 'gpt-4.4-mini';
+export const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+export const RSS_FETCH_TIMEOUT_MS = 10_000;
