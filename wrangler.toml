@@ -7,13 +7,13 @@ compatibility_flags = ["nodejs_compat"]
 crons = ["*/30 * * * *"]
 
 # Serves frontend/ directly from this Worker (no separate Pages project).
-# API routes still run through src/worker.js; everything else is served as
-# a static file, falling back to index.html for unmatched paths.
+# Requests matching a real file in frontend/ are served directly; anything
+# else (including all /api/* routes) falls through to src/worker.js, which
+# handles /api/* itself and proxies everything else to ASSETS/index.html
+# (see the fetch handler in src/worker.js).
 [assets]
 directory = "./frontend"
 binding = "ASSETS"
-run_worker_first = ["/api/*"]
-not_found_handling = "single-page-application"
 
 [[d1_databases]]
 binding = "DB"

@@ -30,7 +30,14 @@ app.route('/api/admin/topics', adminTopics);
 app.route('/api/admin/sources', adminSources);
 app.route('/api/admin/stats', adminStats);
 
-app.notFound((c) => c.json({ error: 'Not found' }, 404));
+// Anything under /api/* that doesn't match a route above is a real 404.
+// Anything else reaching the Worker is a path with no matching static file
+// in frontend/ (e.g. /article/:id from a push notification) — fall back to
+// the SPA shell so client-side code can handle it.
+app.notFound((c) => {
+  if (c.req.path.startsWith('/api/')) return c.json({ error: 'Not found' }, 404);
+  return c.env.ASSETS.fetch(new URL('/index.html', c.req.url));
+});
 
 export default {
   fetch: app.fetch,
