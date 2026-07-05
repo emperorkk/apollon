@@ -1,5 +1,26 @@
 import webpush from 'web-push';
 
+// web-push's sendNotification() sends the final request via Node's
+// https.request(), which Workers doesn't support (no raw socket-level HTTP
+// client, only fetch()). generateRequestDetails() does everything else
+// (VAPID signing, payload encryption) without touching the network, so we
+// take the request it builds and send it ourselves via fetch().
+async function sendViaFetch(sub, payload) {
+  const subscription = {
+    endpoint: sub.endpoint,
+    keys: { p256dh: sub.p256dh, auth: sub.auth },
+  };
+
+  const { endpoint, method, headers, body } = webpush.generateRequestDetails(subscription, payload);
+
+  const res = await fetch(endpoint, { method, headers, body });
+  if (!res.ok) {
+    const err = new Error(`Push service responded ${res.status}`);
+    err.statusCode = res.status;
+    throw err;
+  }
+}
+
 // Fan out a Web Push notification to every subscriber when a level-5 topic
 // trigger fires (spec §5.6). Failures for individual (likely stale)
 // subscriptions are logged and skipped rather than aborting the batch.
@@ -24,13 +45,7 @@ export async function notifySubscribers(env, article, topic) {
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
-          payload
-        );
+        await sendViaFetch(sub, payload);
       } catch (err) {
         console.error(`[notify] push failed for ${sub.endpoint}: ${err.message}`);
         if (err.statusCode === 404 || err.statusCode === 410) {

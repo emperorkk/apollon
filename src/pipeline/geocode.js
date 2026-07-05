@@ -1,5 +1,5 @@
 import { getCachedGeocode, cacheGeocode } from '../lib/db.js';
-import { NOMINATIM_USER_AGENT, NOMINATIM_DELAY_MS } from '../lib/constants.js';
+import { APP_USER_AGENT, NOMINATIM_DELAY_MS } from '../lib/constants.js';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -10,7 +10,7 @@ async function geocodeOne(db, placeName) {
   if (cached) return { lat: cached.lat, lng: cached.lng };
 
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(placeName)}`;
-  const res = await fetch(url, { headers: { 'User-Agent': NOMINATIM_USER_AGENT } });
+  const res = await fetch(url, { headers: { 'User-Agent': APP_USER_AGENT } });
   if (!res.ok) return null;
 
   const results = await res.json();
