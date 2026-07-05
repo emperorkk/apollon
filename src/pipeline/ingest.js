@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import { articleExists, recordSourceError, recordSourceSuccess } from '../lib/db.js';
+import { getExistingGuids, recordSourceError, recordSourceSuccess } from '../lib/db.js';
 import { RSS_FETCH_TIMEOUT_MS, APP_USER_AGENT } from '../lib/constants.js';
 
 const parser = new Parser();
@@ -42,16 +42,19 @@ export async function fetchNewArticles(db, source) {
     return [];
   }
 
-  const fresh = [];
-  for (const item of feed.items ?? []) {
-    const guid = item.guid || item.id || item.link;
-    if (!guid) continue;
+  const items = (feed.items ?? []).filter((item) => item.guid || item.id || item.link);
+  if (!items.length) return [];
 
-    const id = await sha256Hex(guid);
-    if (await articleExists(db, guid)) continue;
+  const guids = items.map((item) => item.guid || item.id || item.link);
+  const existingGuids = await getExistingGuids(db, guids);
+
+  const fresh = [];
+  for (const item of items) {
+    const guid = item.guid || item.id || item.link;
+    if (existingGuids.has(guid)) continue;
 
     fresh.push({
-      id,
+      id: await sha256Hex(guid),
       guid,
       source_id: source.id,
       url: item.link,

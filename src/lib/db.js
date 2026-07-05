@@ -20,6 +20,21 @@ export async function articleExists(db, guid) {
   return !!row;
 }
 
+// Bulk existence check: one D1 round-trip for a whole list of guids instead
+// of one per guid. Cloudflare caps total binding calls ("API requests") per
+// invocation, and checking each RSS item individually across ~20 sources
+// was blowing through it well before subrequests (fetch calls) were even
+// close to their own limit.
+export async function getExistingGuids(db, guids) {
+  if (!guids.length) return new Set();
+  const placeholders = guids.map(() => '?').join(',');
+  const { results } = await db
+    .prepare(`SELECT guid FROM articles WHERE guid IN (${placeholders})`)
+    .bind(...guids)
+    .all();
+  return new Set(results.map((r) => r.guid));
+}
+
 export async function recordSourceError(db, sourceId, message) {
   await db
     .prepare("UPDATE sources SET last_error = ?, last_error_at = datetime('now') WHERE id = ?")

@@ -11,17 +11,24 @@ import { MAX_FINALIZE_PER_RUN } from './lib/constants.js';
 // INSERT OR IGNORE on the deterministic sha256(guid) id naturally dedupes
 // against articles already queued/batched/ready from an earlier tick.
 
+// One batched round-trip for all of a source's new articles instead of one
+// D1 call per article — see getExistingGuids in lib/db.js for why this
+// matters (Cloudflare's per-invocation cap on binding/"API" calls, distinct
+// from and much easier to hit than the outbound fetch() subrequest cap).
 async function insertPendingArticles(db, articles) {
-  for (const a of articles) {
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO pending_articles
-          (id, guid, source_id, url, title_orig, body, language, pub_date, greece_flag, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`
-      )
-      .bind(a.id, a.guid, a.source_id, a.url, a.title_orig, a.body, a.language, a.pub_date, a.greece_flag)
-      .run();
-  }
+  if (!articles.length) return;
+
+  const stmt = db.prepare(
+    `INSERT OR IGNORE INTO pending_articles
+      (id, guid, source_id, url, title_orig, body, language, pub_date, greece_flag, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`
+  );
+
+  await db.batch(
+    articles.map((a) =>
+      stmt.bind(a.id, a.guid, a.source_id, a.url, a.title_orig, a.body, a.language, a.pub_date, a.greece_flag)
+    )
+  );
 }
 
 async function ingestNewArticles(db) {
@@ -156,11 +163,9 @@ async function insertArticle(db, article) {
 
 async function linkTopics(db, articleId, topicNames, allTopics) {
   const matched = allTopics.filter((t) => topicNames.includes(t.name));
-  for (const topic of matched) {
-    await db
-      .prepare('INSERT OR IGNORE INTO article_topics (article_id, topic_id) VALUES (?, ?)')
-      .bind(articleId, topic.id)
-      .run();
+  if (matched.length) {
+    const stmt = db.prepare('INSERT OR IGNORE INTO article_topics (article_id, topic_id) VALUES (?, ?)');
+    await db.batch(matched.map((t) => stmt.bind(articleId, t.id)));
   }
   return matched;
 }

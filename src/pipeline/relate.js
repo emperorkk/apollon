@@ -15,16 +15,19 @@ export async function computeRelations(env, article, embedding, topicIds) {
     (m) => m.score >= SIMILARITY_THRESHOLD && m.id !== article.id
   );
 
-  for (const match of related) {
+  if (!related.length) return;
+
+  const stmt = env.DB.prepare(
+    'INSERT INTO article_relations (article_a, article_b, similarity, shared_tags) VALUES (?, ?, ?, ?) ' +
+      'ON CONFLICT(article_a, article_b) DO UPDATE SET similarity = excluded.similarity, shared_tags = excluded.shared_tags'
+  );
+
+  const batch = related.map((match) => {
     const [articleA, articleB] = [article.id, match.id].sort();
     const otherTopics = JSON.parse(match.metadata?.topics ?? '[]');
     const sharedTags = (topicIds ?? []).filter((t) => otherTopics.includes(t));
+    return stmt.bind(articleA, articleB, match.score, JSON.stringify(sharedTags));
+  });
 
-    await env.DB.prepare(
-      'INSERT INTO article_relations (article_a, article_b, similarity, shared_tags) VALUES (?, ?, ?, ?) ' +
-        'ON CONFLICT(article_a, article_b) DO UPDATE SET similarity = excluded.similarity, shared_tags = excluded.shared_tags'
-    )
-      .bind(articleA, articleB, match.score, JSON.stringify(sharedTags))
-      .run();
-  }
+  await env.DB.batch(batch);
 }
