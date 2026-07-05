@@ -1,10 +1,125 @@
 import { getActiveSources, getActiveTopics } from './lib/db.js';
 import { fetchNewArticles } from './pipeline/ingest.js';
-import { processArticle } from './pipeline/process.js';
+import { submitBatch, getBatchStatus, downloadBatchResults } from './pipeline/batch.js';
 import { geocodeArticle } from './pipeline/geocode.js';
 import { embedArticle } from './pipeline/embed.js';
 import { computeRelations } from './pipeline/relate.js';
 import { maybeNotify } from './pipeline/notify.js';
+import { MAX_FINALIZE_PER_RUN } from './lib/constants.js';
+
+// --- ingest: RSS -> pending_articles (status='queued') ----------------------
+// INSERT OR IGNORE on the deterministic sha256(guid) id naturally dedupes
+// against articles already queued/batched/ready from an earlier tick.
+
+async function insertPendingArticles(db, articles) {
+  for (const a of articles) {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO pending_articles
+          (id, guid, source_id, url, title_orig, body, language, pub_date, greece_flag, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`
+      )
+      .bind(a.id, a.guid, a.source_id, a.url, a.title_orig, a.body, a.language, a.pub_date, a.greece_flag)
+      .run();
+  }
+}
+
+async function ingestNewArticles(db) {
+  const sources = await getActiveSources(db);
+  let count = 0;
+  for (const source of sources) {
+    const newArticles = await fetchNewArticles(db, source);
+    await insertPendingArticles(db, newArticles);
+    count += newArticles.length;
+  }
+  return count;
+}
+
+// --- batch submit: queued pending_articles -> one OpenAI batch job ---------
+// At most one batch in flight at a time, keeping this simple. Submission is
+// ~2 subrequests total no matter how many articles are queued.
+
+async function submitQueuedBatch(env, db) {
+  const openBatch = await db
+    .prepare("SELECT 1 FROM batch_jobs WHERE status NOT IN ('completed','failed','expired','cancelled') LIMIT 1")
+    .first();
+  if (openBatch) return null;
+
+  const { results: queued } = await db.prepare("SELECT * FROM pending_articles WHERE status = 'queued'").all();
+  if (!queued.length) return null;
+
+  const topics = await getActiveTopics(db);
+  const { batchId, status } = await submitBatch(env, queued, topics.map((t) => t.name));
+
+  await db.prepare('INSERT INTO batch_jobs (id, status) VALUES (?, ?)').bind(batchId, status).run();
+
+  const ids = queued.map((a) => a.id);
+  const placeholders = ids.map(() => '?').join(',');
+  await db
+    .prepare(`UPDATE pending_articles SET batch_id = ?, status = 'batched' WHERE id IN (${placeholders})`)
+    .bind(batchId, ...ids)
+    .run();
+
+  return { batchId, count: queued.length };
+}
+
+// --- batch sync: poll open batch jobs, pull results down once completed ----
+
+async function syncBatchStatuses(env, db) {
+  const { results: openBatches } = await db
+    .prepare("SELECT * FROM batch_jobs WHERE status NOT IN ('completed','failed','expired','cancelled')")
+    .all();
+
+  for (const job of openBatches) {
+    let remote;
+    try {
+      remote = await getBatchStatus(env, job.id);
+    } catch (err) {
+      console.error(`[cron] failed to check batch ${job.id}: ${err.message}`);
+      continue;
+    }
+
+    if (remote.status === 'completed') {
+      const resultsMap = await downloadBatchResults(env, remote);
+      for (const [customId, { result, error }] of resultsMap) {
+        if (error) {
+          await db
+            .prepare("UPDATE pending_articles SET status = 'failed', error_message = ? WHERE id = ?")
+            .bind(JSON.stringify(error), customId)
+            .run();
+        } else {
+          await db
+            .prepare("UPDATE pending_articles SET status = 'ready', gpt_result = ? WHERE id = ?")
+            .bind(JSON.stringify(result), customId)
+            .run();
+        }
+      }
+      await db
+        .prepare("UPDATE batch_jobs SET status = 'completed', completed_at = datetime('now') WHERE id = ?")
+        .bind(job.id)
+        .run();
+    } else if (['failed', 'expired', 'cancelled'].includes(remote.status)) {
+      await db
+        .prepare(
+          "UPDATE batch_jobs SET status = ?, completed_at = datetime('now'), error_message = ? WHERE id = ?"
+        )
+        .bind(remote.status, JSON.stringify(remote.errors ?? null), job.id)
+        .run();
+      await db
+        .prepare(
+          "UPDATE pending_articles SET status = 'failed', error_message = 'Batch job did not complete' WHERE batch_id = ? AND status = 'batched'"
+        )
+        .bind(job.id)
+        .run();
+    } else if (remote.status !== job.status) {
+      await db.prepare('UPDATE batch_jobs SET status = ? WHERE id = ?').bind(remote.status, job.id).run();
+    }
+  }
+}
+
+// --- finalize: ready pending_articles -> full pipeline -> articles ---------
+// Bounded per tick (MAX_FINALIZE_PER_RUN) so a big batch completing all at
+// once can't blow the subrequest limit; leftovers finish on later ticks.
 
 async function insertArticle(db, article) {
   await db
@@ -50,89 +165,107 @@ async function linkTopics(db, articleId, topicNames, allTopics) {
   return matched;
 }
 
-async function processOneArticle(env, db, raw, allTopics) {
-  const gpt = await processArticle(env, raw, allTopics.map((t) => t.name));
-
-  const greeceFlag = raw.greece_flag || gpt.greece_related ? 1 : 0;
+async function finalizeArticle(env, db, pending, gptResult, allTopics) {
+  const greeceFlag = pending.greece_flag || gptResult.greece_related ? 1 : 0;
 
   const article = {
-    id: raw.id,
-    guid: raw.guid,
-    source_id: raw.source_id,
-    url: raw.url,
-    title_orig: raw.title_orig,
-    title_en: gpt.title_en ?? null,
-    summary_en: gpt.summary_en ?? null,
-    synopsis_gr: gpt.synopsis_gr ?? null,
-    language: raw.language,
-    importance: gpt.importance ?? 1,
-    pub_date: raw.pub_date,
+    id: pending.id,
+    guid: pending.guid,
+    source_id: pending.source_id,
+    url: pending.url,
+    title_orig: pending.title_orig,
+    title_en: gptResult.title_en ?? null,
+    summary_en: gptResult.summary_en ?? null,
+    synopsis_gr: gptResult.synopsis_gr ?? null,
+    language: pending.language,
+    importance: gptResult.importance ?? 1,
+    pub_date: pending.pub_date,
     greece_flag: greeceFlag,
   };
 
   await insertArticle(db, article);
-  const matchedTopics = await linkTopics(db, article.id, gpt.topics ?? [], allTopics);
+  const matchedTopics = await linkTopics(db, article.id, gptResult.topics ?? [], allTopics);
 
   const failedGeocodes = await geocodeArticle(db, article.id, {
-    subjectLocation: gpt.subject_location ?? null,
-    otherLocations: gpt.entities?.locations ?? [],
+    subjectLocation: gptResult.subject_location ?? null,
+    otherLocations: gptResult.entities?.locations ?? [],
   });
 
   const topicIds = matchedTopics.map((t) => t.id);
   const embedding = await embedArticle(env, article, topicIds);
   await computeRelations(env, article, embedding, topicIds);
-
   await maybeNotify(env, article, matchedTopics);
 
   return { failedGeocodes };
 }
 
-// Entry point for the Cron Trigger (spec §5.1). Runs every 30 minutes,
-// processing all active sources sequentially so the Nominatim rate limit
-// (1 req/sec) is respected across the whole batch. Logs each run to
-// cron_runs for the admin stats view (spec §7.7).
+async function finalizeReadyArticles(env, db) {
+  const topics = await getActiveTopics(db);
+  const { results: ready } = await db
+    .prepare('SELECT * FROM pending_articles WHERE status = \'ready\' LIMIT ?')
+    .bind(MAX_FINALIZE_PER_RUN)
+    .all();
+
+  let finalized = 0;
+  let failedGeocodes = 0;
+
+  for (const pending of ready) {
+    try {
+      const gptResult = JSON.parse(pending.gpt_result);
+      const result = await finalizeArticle(env, db, pending, gptResult, topics);
+      failedGeocodes += result.failedGeocodes;
+      finalized += 1;
+      await db.prepare('DELETE FROM pending_articles WHERE id = ?').bind(pending.id).run();
+    } catch (err) {
+      console.error(`[cron] failed to finalize article ${pending.id}: ${err.message}`);
+      await db
+        .prepare("UPDATE pending_articles SET status = 'failed', error_message = ? WHERE id = ?")
+        .bind(err.message, pending.id)
+        .run();
+    }
+  }
+
+  return { finalized, failedGeocodes };
+}
+
+// Entry point for the Cron Trigger (spec §5.1). Runs every 30 minutes.
+// GPT processing goes through the OpenAI Batch API rather than live calls
+// per article — ingestion isn't time-critical, and a live call per article
+// blows through Cloudflare's per-invocation subrequest limit whenever a
+// backlog of articles lands in one tick. Each stage below is cheap and
+// roughly constant-cost regardless of article volume, except the bounded
+// finalize step. Logs each run to cron_runs for the admin stats view
+// (spec §7.7).
 export async function runCron(env) {
   const db = env.DB;
 
-  const { meta } = await db
-    .prepare("INSERT INTO cron_runs (status) VALUES ('running')")
-    .run();
+  const { meta } = await db.prepare("INSERT INTO cron_runs (status) VALUES ('running')").run();
   const runId = meta.last_row_id;
 
-  let articlesIngested = 0;
-  let failedGeocodes = 0;
-
   try {
-    const [sources, topics] = await Promise.all([getActiveSources(db), getActiveTopics(db)]);
-
-    for (const source of sources) {
-      const newArticles = await fetchNewArticles(db, source);
-
-      for (const raw of newArticles) {
-        try {
-          const result = await processOneArticle(env, db, raw, topics);
-          articlesIngested += 1;
-          failedGeocodes += result.failedGeocodes;
-        } catch (err) {
-          console.error(`[cron] failed processing article from ${source.id}: ${err.message}`);
-        }
-      }
-    }
+    const ingested = await ingestNewArticles(db);
+    const submitted = await submitQueuedBatch(env, db);
+    await syncBatchStatuses(env, db);
+    const { finalized, failedGeocodes } = await finalizeReadyArticles(env, db);
 
     await db
       .prepare(
         `UPDATE cron_runs SET finished_at = datetime('now'), status = 'success',
            articles_ingested = ?, failed_geocodes = ? WHERE id = ?`
       )
-      .bind(articlesIngested, failedGeocodes, runId)
+      .bind(finalized, failedGeocodes, runId)
       .run();
+
+    console.log(
+      `[cron] ingested=${ingested} submitted_batch=${submitted ? submitted.count : 0} finalized=${finalized}`
+    );
   } catch (err) {
     await db
       .prepare(
         `UPDATE cron_runs SET finished_at = datetime('now'), status = 'error',
-           articles_ingested = ?, failed_geocodes = ?, error_message = ? WHERE id = ?`
+           error_message = ? WHERE id = ?`
       )
-      .bind(articlesIngested, failedGeocodes, err.message, runId)
+      .bind(err.message, runId)
       .run();
     throw err;
   }

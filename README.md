@@ -7,8 +7,9 @@ See [`WID_Technical_Specification_v1.0.md`](./WID_Technical_Specification_v1.0.m
 
 ## Architecture
 
-- **Worker** (`src/`) — cron-driven RSS ingestion, GPT-4.4-mini processing, Nominatim
-  geocoding, OpenAI embeddings + Vectorize, and the public/admin JSON API.
+- **Worker** (`src/`) — cron-driven RSS ingestion, GPT-5.4-mini processing via
+  the OpenAI Batch API, Nominatim geocoding, OpenAI embeddings + Vectorize,
+  and the public/admin JSON API.
 - **Static assets** (`frontend/`) — a vanilla JS/HTML/CSS single-page app (Leaflet
   map, feed, Cytoscape relation graph, admin console). No build step. Served
   directly by the same Worker via the `[assets]` binding in `wrangler.toml`.
@@ -63,6 +64,7 @@ Generate a VAPID key pair with `npx web-push generate-vapid-keys`.
 npx wrangler d1 execute wid-db --remote --file=./migrations/0001_initial.sql
 npx wrangler d1 execute wid-db --remote --file=./migrations/0002_seed.sql
 npx wrangler d1 execute wid-db --remote --file=./migrations/0003_cron_runs.sql
+npx wrangler d1 execute wid-db --remote --file=./migrations/0004_batch_pipeline.sql
 ```
 
 ### 4. Google OAuth

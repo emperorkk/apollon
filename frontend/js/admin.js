@@ -15,6 +15,13 @@ async function loadStats() {
   if (!stats) return '<p class="card-placeholder">Failed to load stats.</p>';
 
   const lastRun = stats.last_cron_run;
+  const lastBatch = stats.last_batch_job;
+  const pending = stats.pending_articles_by_status ?? {};
+  const pendingSummary =
+    Object.entries(pending)
+      .map(([status, n]) => `${n} ${status}`)
+      .join(', ') || 'none';
+
   const tiles = [
     ['Articles Today', stats.articles_today],
     ['Articles This Week', stats.articles_this_week],
@@ -24,6 +31,8 @@ async function loadStats() {
     ['Failed Geocodes (24h)', stats.failed_geocoding_count_24h],
     ['Last Cron Status', lastRun?.status ?? 'never run'],
     ['Last Cron Run', lastRun ? new Date(lastRun.started_at).toLocaleString() : '—'],
+    ['Pending Articles', pendingSummary],
+    ['Last Batch Job', lastBatch ? `${lastBatch.status}` : 'none yet'],
   ];
 
   return `<div class="stat-grid">${tiles

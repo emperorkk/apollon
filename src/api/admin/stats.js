@@ -11,18 +11,21 @@ const AI_COST_PER_ARTICLE = 27.5 / 216_000;
 app.get('/', async (c) => {
   const db = c.env.DB;
 
-  const [today, week, month, subscribers, lastRun, failedGeocodes24h] = await Promise.all([
-    db.prepare("SELECT COUNT(*) AS n FROM articles WHERE date(ingested_at) = date('now')").first(),
-    db.prepare("SELECT COUNT(*) AS n FROM articles WHERE ingested_at >= datetime('now', '-7 days')").first(),
-    db.prepare("SELECT COUNT(*) AS n FROM articles WHERE ingested_at >= datetime('now', '-1 month')").first(),
-    db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').first(),
-    db.prepare('SELECT * FROM cron_runs ORDER BY started_at DESC LIMIT 1').first(),
-    db
-      .prepare(
-        "SELECT COALESCE(SUM(failed_geocodes), 0) AS n FROM cron_runs WHERE started_at >= datetime('now', '-1 day')"
-      )
-      .first(),
-  ]);
+  const [today, week, month, subscribers, lastRun, failedGeocodes24h, pendingByStatus, lastBatch] =
+    await Promise.all([
+      db.prepare("SELECT COUNT(*) AS n FROM articles WHERE date(ingested_at) = date('now')").first(),
+      db.prepare("SELECT COUNT(*) AS n FROM articles WHERE ingested_at >= datetime('now', '-7 days')").first(),
+      db.prepare("SELECT COUNT(*) AS n FROM articles WHERE ingested_at >= datetime('now', '-1 month')").first(),
+      db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').first(),
+      db.prepare('SELECT * FROM cron_runs ORDER BY started_at DESC LIMIT 1').first(),
+      db
+        .prepare(
+          "SELECT COALESCE(SUM(failed_geocodes), 0) AS n FROM cron_runs WHERE started_at >= datetime('now', '-1 day')"
+        )
+        .first(),
+      db.prepare('SELECT status, COUNT(*) AS n FROM pending_articles GROUP BY status').all(),
+      db.prepare('SELECT * FROM batch_jobs ORDER BY submitted_at DESC LIMIT 1').first(),
+    ]);
 
   return c.json({
     articles_today: today.n,
@@ -39,6 +42,10 @@ app.get('/', async (c) => {
         }
       : null,
     failed_geocoding_count_24h: failedGeocodes24h.n,
+    pending_articles_by_status: Object.fromEntries(pendingByStatus.results.map((r) => [r.status, r.n])),
+    last_batch_job: lastBatch
+      ? { id: lastBatch.id, status: lastBatch.status, submitted_at: lastBatch.submitted_at }
+      : null,
   });
 });
 
