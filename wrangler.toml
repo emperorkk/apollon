@@ -1,0 +1,27 @@
+name = "world-intelligence-dashboard"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["*/30 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wid-db"
+database_id = "<your-d1-database-id>"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "wid-articles"
+
+[vars]
+ENVIRONMENT = "production"
+ADMIN_EMAIL = "kkourentzes@gmail.com"
+
+# Secrets — set via: wrangler secret put SECRET_NAME
+# OPENAI_API_KEY
+# GOOGLE_CLIENT_ID
+# JWT_SECRET
+# VAPID_PUBLIC_KEY
+# VAPID_PRIVATE_KEY
