@@ -1,11 +1,13 @@
 const BASE = '/api';
 
-export async function apiGet(path, params = {}) {
+export async function apiGet(path, params = {}, token) {
   const url = new URL(BASE + path, location.origin);
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
   }
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
   return res.json();
 }
