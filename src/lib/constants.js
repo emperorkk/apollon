@@ -12,7 +12,11 @@ export const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
 export const RSS_FETCH_TIMEOUT_MS = 10_000;
 export const BATCH_COMPLETION_WINDOW = '24h';
 // Cap on how many completed-batch articles get fully processed (geocode +
-// embed + relate) per cron tick, so a large batch finishing all at once
-// can't blow the per-invocation subrequest limit. Leftovers finish on
-// subsequent ticks.
-export const MAX_FINALIZE_PER_RUN = 20;
+// embed + relate) per cron tick. Each article can need several sequential
+// geocode lookups, each forced to wait ~1.1s (Nominatim's rate limit) — at
+// 20/tick that's 60-100+ seconds, risking the request getting cut off
+// before it reaches the final "mark as success" update (leaving cron_runs
+// stuck at 'running'). Kept small so a tick reliably finishes; leftovers
+// just finish on later ticks, which is fine since ingestion isn't
+// time-critical.
+export const MAX_FINALIZE_PER_RUN = 5;
