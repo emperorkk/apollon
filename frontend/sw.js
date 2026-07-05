@@ -1,6 +1,6 @@
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {};
-  const title = data.title || 'World Intelligence Dashboard';
+  const title = data.title || 'Apollon';
 
   event.waitUntil(
     self.registration.showNotification(title, {
