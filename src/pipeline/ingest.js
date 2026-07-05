@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import { articleExists } from '../lib/db.js';
+import { articleExists, recordSourceError, recordSourceSuccess } from '../lib/db.js';
 import { RSS_FETCH_TIMEOUT_MS, APP_USER_AGENT } from '../lib/constants.js';
 
 const parser = new Parser();
@@ -35,8 +35,10 @@ export async function fetchNewArticles(db, source) {
   try {
     const xml = await fetchXml(source.rss_url);
     feed = await parser.parseString(xml);
+    await recordSourceSuccess(db, source.id);
   } catch (err) {
     console.error(`[ingest] failed to fetch ${source.id}: ${err.message}`);
+    await recordSourceError(db, source.id, err.message);
     return [];
   }
 

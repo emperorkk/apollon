@@ -65,6 +65,7 @@ npx wrangler d1 execute wid-db --remote --file=./migrations/0001_initial.sql
 npx wrangler d1 execute wid-db --remote --file=./migrations/0002_seed.sql
 npx wrangler d1 execute wid-db --remote --file=./migrations/0003_cron_runs.sql
 npx wrangler d1 execute wid-db --remote --file=./migrations/0004_batch_pipeline.sql
+npx wrangler d1 execute wid-db --remote --file=./migrations/0005_source_errors.sql
 ```
 
 ### 4. Google OAuth

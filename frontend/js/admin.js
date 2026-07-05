@@ -65,6 +65,12 @@ async function loadTopics() {
     </table>`;
 }
 
+function formatSourceError(s) {
+  if (!s.last_error) return '<span class="card-placeholder">—</span>';
+  const when = s.last_error_at ? new Date(s.last_error_at).toLocaleString() : '';
+  return `<span title="${escapeHtml(s.last_error)}">${escapeHtml(s.last_error.slice(0, 60))}${s.last_error.length > 60 ? '…' : ''}</span><br /><span class="stat-tile-label">${when}</span>`;
+}
+
 async function loadSources() {
   const { sources } = await apiGet('/admin/sources', {}, state.token);
   const rows = sources
@@ -75,15 +81,19 @@ async function loadSources() {
       <td>${escapeHtml(s.region)}</td>
       <td>${escapeHtml(s.language)}</td>
       <td>${escapeHtml(s.category_bias ?? '')}</td>
-      <td><span class="status-dot ${s.active ? 'active' : ''}"></span></td>
-      <td><button type="button" class="btn-ghost" data-edit-source="${s.id}">Edit</button></td>
+      <td><span class="status-dot ${s.active ? (s.last_error ? 'error' : 'active') : ''}"></span></td>
+      <td>${formatSourceError(s)}</td>
+      <td>
+        <button type="button" class="btn-ghost" data-edit-source="${s.id}">Edit</button>
+        <button type="button" class="btn-ghost" data-toggle-source="${s.id}" data-active="${s.active}">${s.active ? 'Disable' : 'Enable'}</button>
+      </td>
     </tr>`
     )
     .join('');
 
   return `
     <table class="data-table">
-      <thead><tr><th>Name</th><th>Region</th><th>Lang</th><th>Category</th><th>Active</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Region</th><th>Lang</th><th>Category</th><th>Active</th><th>Last Error</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
@@ -203,6 +213,14 @@ function wireSourceActions() {
       const { sources } = await apiGet('/admin/sources', {}, state.token);
       const source = sources.find((s) => s.id === btn.dataset.editSource);
       openSourceDialog(source);
+    });
+  });
+
+  document.querySelectorAll('[data-toggle-source]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const isActive = btn.dataset.active === '1' || btn.dataset.active === 'true';
+      await apiPut(`/admin/sources/${btn.dataset.toggleSource}`, { active: !isActive }, state.token);
+      renderAdmin();
     });
   });
 }

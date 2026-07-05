@@ -20,6 +20,22 @@ export async function articleExists(db, guid) {
   return !!row;
 }
 
+export async function recordSourceError(db, sourceId, message) {
+  await db
+    .prepare("UPDATE sources SET last_error = ?, last_error_at = datetime('now') WHERE id = ?")
+    .bind(message.slice(0, 500), sourceId)
+    .run();
+}
+
+export async function recordSourceSuccess(db, sourceId) {
+  await db
+    .prepare(
+      "UPDATE sources SET last_error = NULL, last_error_at = NULL, last_success_at = datetime('now') WHERE id = ?"
+    )
+    .bind(sourceId)
+    .run();
+}
+
 export async function getCachedGeocode(db, placeName) {
   return db
     .prepare('SELECT lat, lng FROM geocode_cache WHERE place_name = ?')
