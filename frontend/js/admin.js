@@ -82,7 +82,10 @@ async function loadSources() {
 async function renderAdmin() {
   mainEl().innerHTML = `
     <section class="admin-section">
-      <div class="admin-section-header"><span class="admin-section-title">System Stats</span></div>
+      <div class="admin-section-header">
+        <span class="admin-section-title">System Stats</span>
+        <button type="button" class="btn-primary" id="run-cron-btn">Run Ingestion Now</button>
+      </div>
       <div id="stats-container">Loading&hellip;</div>
     </section>
 
@@ -110,6 +113,26 @@ async function renderAdmin() {
 
   wireTopicActions();
   wireSourceActions();
+  wireCronButton();
+}
+
+function wireCronButton() {
+  const btn = document.getElementById('run-cron-btn');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    try {
+      const result = await apiPost('/admin/cron/run', {}, state.token);
+      if (result.started) {
+        btn.textContent = 'Running… (refresh stats in ~1-2 min)';
+      } else {
+        btn.textContent = result.reason ?? 'Already running';
+      }
+    } catch (err) {
+      console.error('Failed to start cron run', err);
+      btn.textContent = 'Failed to start — see console';
+    }
+  });
 }
 
 function openTopicDialog(topic) {
