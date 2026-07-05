@@ -129,17 +129,20 @@ function wireCronButton() {
   const btn = document.getElementById('run-cron-btn');
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    btn.textContent = 'Starting…';
+    btn.textContent = 'Running…';
     try {
       const result = await apiPost('/admin/cron/run', {}, state.token);
       if (result.started) {
-        btn.textContent = 'Running… (refresh stats in ~1-2 min)';
-      } else {
-        btn.textContent = result.reason ?? 'Already running';
+        btn.textContent = `Done — ingested ${result.ingested}, batched ${result.submittedBatch}, finalized ${result.finalized}`;
+        await renderAdmin();
+        return;
       }
+      btn.textContent = result.reason ?? 'Already running';
     } catch (err) {
-      console.error('Failed to start cron run', err);
-      btn.textContent = 'Failed to start — see console';
+      console.error('Failed to run cron', err);
+      btn.textContent = 'Failed — see console';
+    } finally {
+      btn.disabled = false;
     }
   });
 }

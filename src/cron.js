@@ -256,9 +256,11 @@ export async function runCron(env) {
       .bind(finalized, failedGeocodes, runId)
       .run();
 
+    const summary = { ingested, submittedBatch: submitted ? submitted.count : 0, finalized, failedGeocodes };
     console.log(
-      `[cron] ingested=${ingested} submitted_batch=${submitted ? submitted.count : 0} finalized=${finalized}`
+      `[cron] ingested=${ingested} submitted_batch=${summary.submittedBatch} finalized=${finalized}`
     );
+    return summary;
   } catch (err) {
     await db
       .prepare(
