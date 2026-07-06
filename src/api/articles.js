@@ -58,7 +58,7 @@ app.get('/', async (c) => {
     binds.push(region);
   }
 
-  const sql = `SELECT a.* FROM ${from} WHERE ${conditions.join(' AND ')} ORDER BY a.importance DESC, a.pub_date DESC LIMIT ? OFFSET ?`;
+  const sql = `SELECT a.* FROM ${from} WHERE ${conditions.join(' AND ')} ORDER BY a.pub_date DESC, a.importance DESC LIMIT ? OFFSET ?`;
   const { results } = await db.prepare(sql).bind(...binds, limit, offset).all();
 
   const topicsByArticle = await attachTopics(db, results.map((r) => r.id));

@@ -39,28 +39,38 @@
     </header>
 
     <main class="app-main">
-      <section class="map-panel">
-        <div id="map"></div>
-        <div class="map-controls">
-          <span class="map-legend" id="map-legend"></span>
-          <label class="days-control" for="days-slider">
-            <span>WINDOW</span>
-            <input type="range" id="days-slider" min="1" max="30" value="5" />
-            <span class="days-value"><span id="days-value">5</span>D</span>
-          </label>
-        </div>
-      </section>
+      <div class="main-content">
+        <section class="map-panel">
+          <div id="map"></div>
+          <div class="map-controls">
+            <span class="map-legend" id="map-legend"></span>
+            <label class="days-control" for="days-slider">
+              <span>WINDOW</span>
+              <input type="range" id="days-slider" min="1" max="30" value="5" />
+              <span class="days-value"><span id="days-value">5</span>D</span>
+            </label>
+          </div>
+        </section>
 
-      <section class="feed-panel">
-        <div class="feed-toolbar">
-          <div class="feed-count" id="feed-count">&mdash;</div>
-          <select id="region-filter" class="region-select">
-            <option value="">ALL REGIONS</option>
-          </select>
+        <section class="feed-panel">
+          <div class="feed-toolbar">
+            <div class="feed-count" id="feed-count">&mdash;</div>
+            <select id="region-filter" class="region-select">
+              <option value="">ALL REGIONS</option>
+            </select>
+          </div>
+          <div class="feed-list" id="feed-list"></div>
+          <div class="feed-sentinel" id="feed-sentinel"></div>
+        </section>
+      </div>
+
+      <aside class="keyword-panel">
+        <div class="keyword-panel-header">
+          <span class="admin-section-title">Keywords</span>
+          <span class="days-value">5D</span>
         </div>
-        <div class="feed-list" id="feed-list"></div>
-        <div class="feed-sentinel" id="feed-sentinel"></div>
-      </section>
+        <div class="keyword-list" id="keyword-list">Loading&hellip;</div>
+      </aside>
     </main>
 
     <div class="scrim" id="scrim"></div>

@@ -6,6 +6,7 @@ import { closeArticleCard } from './card.js';
 import { initAuth } from './auth.js';
 import { initPush } from './push.js';
 import { closeGraph } from './graph.js';
+import { initKeywords } from './keywords.js';
 
 function renderTopicFilters() {
   const nav = document.getElementById('topic-filters');
@@ -114,6 +115,7 @@ async function bootstrap() {
   initFeed('feed-list');
   initAuth();
   initPush();
+  initKeywords('keyword-list');
 
   subscribe(() => {});
 }

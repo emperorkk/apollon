@@ -15,19 +15,29 @@ export function initFeed(containerId) {
   sentinel = document.getElementById('feed-sentinel');
   countEl = document.getElementById('feed-count');
 
+  // The sentinel must live inside the scrolling container, and the
+  // observer's root must be that container (not the default viewport) —
+  // .feed-list scrolls internally while the page itself doesn't, so a
+  // viewport-rooted observer never sees it move and "load more" never
+  // re-fires past the first page.
+  container.appendChild(sentinel);
+
   resetAndLoad();
   subscribe(() => resetAndLoad());
 
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) loadMore();
-  });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMore();
+    },
+    { root: container, rootMargin: '200px' }
+  );
   observer.observe(sentinel);
 }
 
 async function resetAndLoad() {
   page = 1;
   exhausted = false;
-  container.innerHTML = '';
+  container.querySelectorAll('.feed-card').forEach((el) => el.remove());
   await loadMore();
 }
 
@@ -48,9 +58,9 @@ async function loadMore() {
       exhausted = true;
       if (page === 1) countEl.textContent = 'NO RESULTS';
     } else {
-      for (const article of data.articles) container.appendChild(renderCard(article));
+      for (const article of data.articles) container.insertBefore(renderCard(article), sentinel);
       page += 1;
-      countEl.textContent = `${container.children.length} ARTICLES`;
+      countEl.textContent = `${container.querySelectorAll('.feed-card').length} ARTICLES`;
     }
   } catch (err) {
     console.error('Failed to load feed', err);
