@@ -4,6 +4,8 @@ export const state = {
   activeTopic: null, // topic name or null
   region: '',
   query: '',
+  articleIds: null, // when set, feed shows exactly these ids (e.g. "view graph as list")
+  articleIdsLabel: '',
   token: localStorage.getItem('wid_token'),
   user: JSON.parse(localStorage.getItem('wid_user') || 'null'),
 };

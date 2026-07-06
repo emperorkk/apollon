@@ -1,4 +1,4 @@
-import { state, subscribe } from './state.js';
+import { state, subscribe, notify } from './state.js';
 import { apiGet } from './api.js';
 import { openArticleCard } from './card.js';
 import { escapeHtml, importanceBarHtml } from './utils.js';
@@ -6,6 +6,7 @@ import { escapeHtml, importanceBarHtml } from './utils.js';
 let container;
 let sentinel;
 let countEl;
+let clearFilterBtn;
 let page = 1;
 let loading = false;
 let exhausted = false;
@@ -14,6 +15,7 @@ export function initFeed(containerId) {
   container = document.getElementById(containerId);
   sentinel = document.getElementById('feed-sentinel');
   countEl = document.getElementById('feed-count');
+  clearFilterBtn = document.getElementById('clear-article-filter');
 
   // The sentinel must live inside the scrolling container, and the
   // observer's root must be that container (not the default viewport) —
@@ -21,6 +23,12 @@ export function initFeed(containerId) {
   // viewport-rooted observer never sees it move and "load more" never
   // re-fires past the first page.
   container.appendChild(sentinel);
+
+  clearFilterBtn.addEventListener('click', () => {
+    state.articleIds = null;
+    state.articleIdsLabel = '';
+    notify();
+  });
 
   resetAndLoad();
   subscribe(() => resetAndLoad());
@@ -37,6 +45,7 @@ export function initFeed(containerId) {
 async function resetAndLoad() {
   page = 1;
   exhausted = false;
+  clearFilterBtn.hidden = !state.articleIds;
   container.querySelectorAll('.feed-card').forEach((el) => el.remove());
   await loadMore();
 }
@@ -46,13 +55,17 @@ async function loadMore() {
   loading = true;
 
   try {
-    const data = await apiGet('/articles', {
-      topic: state.activeTopic,
-      region: state.region,
-      q: state.query,
-      page,
-      limit: 20,
-    });
+    const data = state.articleIds
+      ? await apiGet('/articles', { ids: state.articleIds.join(',') })
+      : await apiGet('/articles', {
+          topic: state.activeTopic,
+          region: state.region,
+          q: state.query,
+          page,
+          limit: 20,
+        });
+
+    if (state.articleIds) exhausted = true; // full result set arrives in one go, no pagination
 
     if (!data.articles.length) {
       exhausted = true;
@@ -60,7 +73,10 @@ async function loadMore() {
     } else {
       for (const article of data.articles) container.insertBefore(renderCard(article), sentinel);
       page += 1;
-      countEl.textContent = `${container.querySelectorAll('.feed-card').length} ARTICLES`;
+      const count = container.querySelectorAll('.feed-card').length;
+      countEl.textContent = state.articleIdsLabel
+        ? `${count} ARTICLES — ${state.articleIdsLabel}`
+        : `${count} ARTICLES`;
     }
   } catch (err) {
     console.error('Failed to load feed', err);

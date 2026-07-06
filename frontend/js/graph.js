@@ -1,7 +1,11 @@
 import { apiGet } from './api.js';
 import { openArticleCard } from './card.js';
+import { state, notify } from './state.js';
 
 let cy;
+let currentArticleIds = [];
+let currentLabel = '';
+let listBtnWired = false;
 
 function openModal() {
   const modal = document.getElementById('graph-modal');
@@ -9,6 +13,26 @@ function openModal() {
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   scrim.classList.add('visible');
+  wireListButton();
+}
+
+function wireListButton() {
+  if (listBtnWired) return;
+  listBtnWired = true;
+  document.getElementById('graph-view-list').addEventListener('click', () => {
+    if (!currentArticleIds.length) return;
+    state.articleIds = currentArticleIds;
+    state.articleIdsLabel = currentLabel;
+    notify();
+    closeGraph();
+    document.querySelector('.feed-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function setGraphResult(articleIds, label) {
+  currentArticleIds = articleIds;
+  currentLabel = label;
+  document.getElementById('graph-view-list').hidden = articleIds.length === 0;
 }
 
 export async function openGraph(articleId) {
@@ -85,6 +109,11 @@ async function renderRelationGraph(rootId) {
     return;
   }
 
+  setGraphResult(
+    data.nodes.map((n) => n.id),
+    'Relation graph'
+  );
+
   const elements = [
     ...data.nodes.map((n) => ({
       data: { id: n.id, label: n.title ?? '', size: importanceToDiameter(n.importance), color: n.color },
@@ -130,6 +159,11 @@ async function renderKeywordGraph(keyword) {
     console.error('Failed to load keyword graph', err);
     return;
   }
+
+  setGraphResult(
+    data.articles.map((a) => a.id),
+    keyword
+  );
 
   const hubId = `__keyword__${keyword}`;
   const elements = [

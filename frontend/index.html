@@ -55,6 +55,7 @@
         <section class="feed-panel">
           <div class="feed-toolbar">
             <div class="feed-count" id="feed-count">&mdash;</div>
+            <button type="button" class="btn-ghost" id="clear-article-filter" hidden>&times; CLEAR FILTER</button>
             <select id="region-filter" class="region-select">
               <option value="">ALL REGIONS</option>
             </select>
@@ -81,6 +82,7 @@
     </aside>
 
     <div class="graph-modal" id="graph-modal" aria-hidden="true">
+      <button class="graph-list-btn" id="graph-view-list" type="button" hidden>VIEW AS LIST</button>
       <button class="graph-close" id="graph-close" type="button">&times; CLOSE</button>
       <div id="graph-container"></div>
     </div>

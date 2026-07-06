@@ -28,8 +28,29 @@ async function attachTopics(db, articleIds) {
 }
 
 // GET /api/articles — feed list with optional filters
+// ?ids=a,b,c bypasses every other filter (days/topic/region/q) and returns
+// exactly those articles, date-descending — used by "view graph as list" to
+// show precisely the articles a relation/keyword graph found, which can
+// span well beyond the default 5-day window (relations look back 30 days).
 app.get('/', async (c) => {
   const db = c.env.DB;
+  const idsParam = c.req.query('ids');
+
+  if (idsParam) {
+    const ids = [...new Set(idsParam.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 200);
+    if (!ids.length) return c.json({ articles: [], page: 1, limit: 0 });
+
+    const placeholders = ids.map(() => '?').join(',');
+    const { results } = await db
+      .prepare(`SELECT * FROM articles WHERE id IN (${placeholders}) ORDER BY pub_date DESC`)
+      .bind(...ids)
+      .all();
+
+    const topicsByArticle = await attachTopics(db, results.map((r) => r.id));
+    const articles = results.map((a) => ({ ...a, topics: topicsByArticle.get(a.id) ?? [] }));
+    return c.json({ articles, page: 1, limit: articles.length });
+  }
+
   const days = clamp(parseInt(c.req.query('days') ?? String(DEFAULT_FEED_DAYS), 10) || DEFAULT_FEED_DAYS, 1, MAX_FEED_DAYS);
   const topic = c.req.query('topic');
   const region = c.req.query('region');

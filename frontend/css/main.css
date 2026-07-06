@@ -797,6 +797,26 @@ a {
   border-color: var(--accent);
 }
 
+.graph-list-btn {
+  position: absolute;
+  top: 20px;
+  right: 130px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: box-shadow var(--transition);
+}
+
+.graph-list-btn:hover {
+  box-shadow: 0 0 14px var(--accent-soft);
+}
+
 #graph-container {
   width: min(1100px, 94vw);
   height: min(720px, 84vh);
