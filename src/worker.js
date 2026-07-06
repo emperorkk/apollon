@@ -14,6 +14,7 @@ import adminTopics from './api/admin/topics.js';
 import adminSources from './api/admin/sources.js';
 import adminStats from './api/admin/stats.js';
 import adminCron from './api/admin/cron.js';
+import adminArticles from './api/admin/articles.js';
 import { runCron } from './cron.js';
 
 const app = new Hono();
@@ -33,6 +34,7 @@ app.route('/api/admin/topics', adminTopics);
 app.route('/api/admin/sources', adminSources);
 app.route('/api/admin/stats', adminStats);
 app.route('/api/admin/cron', adminCron);
+app.route('/api/admin/articles', adminArticles);
 
 // Anything under /api/* that doesn't match a route above is a real 404.
 // Anything else reaching the Worker is a path with no matching static file

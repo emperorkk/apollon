@@ -53,13 +53,19 @@ export async function fetchNewArticles(db, source) {
     const guid = item.guid || item.id || item.link;
     if (existingGuids.has(guid)) continue;
 
+    const rawBody = item['content:encoded'] || item.content || item.contentSnippet || item.summary || '';
+    const body = rawBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // Nothing for GPT to actually analyse -> skip rather than write a thin/
+    // hallucination-prone article with no real body content.
+    if (body.length < 20) continue;
+
     fresh.push({
       id: await sha256Hex(guid),
       guid,
       source_id: source.id,
       url: item.link,
       title_orig: item.title ?? '',
-      body: item['content:encoded'] || item.content || item.contentSnippet || item.summary || '',
+      body,
       pub_date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
       language: source.language,
       greece_flag: source.region === 'GR' ? 1 : 0,

@@ -1,6 +1,8 @@
-import { apiGet } from './api.js';
+import { apiGet, apiDelete } from './api.js';
 import { openGraph } from './graph.js';
 import { escapeHtml, importanceBarHtml } from './utils.js';
+import { state, notify } from './state.js';
+import { ADMIN_EMAIL } from './config.js';
 
 const cardEl = () => document.getElementById('article-card');
 const scrimEl = () => document.getElementById('scrim');
@@ -69,6 +71,11 @@ function render(article) {
   const entitiesHtml =
     entityGroup('People', article.entities?.people) + entityGroup('Organisations', article.entities?.orgs);
 
+  const isAdmin = state.user?.email === ADMIN_EMAIL;
+  const deleteBtnHtml = isAdmin
+    ? '<button class="btn-ghost" id="delete-article-btn" type="button" style="border-color:var(--danger);color:var(--danger);">Delete Article</button>'
+    : '';
+
   bodyEl().innerHTML = `
     <div class="card-meta">
       <span>${escapeHtml(article.source_id)}</span>
@@ -95,11 +102,28 @@ function render(article) {
     <div class="related-list" id="related-list">${relatedHtml}</div>
 
     <button class="btn-primary" id="view-graph-btn" type="button">View Graph</button>
+    ${deleteBtnHtml}
   `;
 
   wireLangToggle();
   wireRelated();
   document.getElementById('view-graph-btn').addEventListener('click', () => openGraph(article.id));
+
+  if (isAdmin) {
+    document.getElementById('delete-article-btn').addEventListener('click', () => deleteArticle(article.id));
+  }
+}
+
+async function deleteArticle(id) {
+  if (!confirm('Delete this article? This cannot be undone.')) return;
+  try {
+    await apiDelete(`/admin/articles/${id}`, {}, state.token);
+    closeArticleCard();
+    notify(); // refresh feed/map so the deleted article disappears
+  } catch (err) {
+    console.error('Failed to delete article', err);
+    alert('Failed to delete article — see console.');
+  }
 }
 
 function wireLangToggle() {
