@@ -25,7 +25,6 @@ app.get('/', async (c) => {
        JOIN articles a ON a.id = ae.article_id
        WHERE a.pub_date >= datetime('now', ?) AND ae.entity_type IN ('person', 'org')
        GROUP BY ae.entity_name, ae.entity_type
-       HAVING count >= 2
        ORDER BY count DESC
        LIMIT 40`
     )
