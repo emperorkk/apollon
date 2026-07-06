@@ -113,7 +113,18 @@ app.get('/:id', async (c) => {
     });
   }
 
-  return c.json({ ...article, locations, topics, related });
+  const { results: entityRows } = await db
+    .prepare('SELECT entity_type, entity_name FROM article_entities WHERE article_id = ?')
+    .bind(id)
+    .all();
+  const entities = { people: [], orgs: [], locations: [] };
+  for (const row of entityRows) {
+    if (row.entity_type === 'person') entities.people.push(row.entity_name);
+    else if (row.entity_type === 'org') entities.orgs.push(row.entity_name);
+    else if (row.entity_type === 'location') entities.locations.push(row.entity_name);
+  }
+
+  return c.json({ ...article, locations, topics, related, entities });
 });
 
 export default app;

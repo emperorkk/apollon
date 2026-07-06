@@ -60,6 +60,15 @@ function render(article) {
       )
       .join('') || '<p class="card-placeholder">No related articles yet.</p>';
 
+  const entityGroup = (label, names) =>
+    names?.length
+      ? `<div><div class="card-section-label">${label}</div><div class="pill-row">${names
+          .map((n) => `<span class="topic-tag">${escapeHtml(n)}</span>`)
+          .join('')}</div></div>`
+      : '';
+  const entitiesHtml =
+    entityGroup('People', article.entities?.people) + entityGroup('Organisations', article.entities?.orgs);
+
   bodyEl().innerHTML = `
     <div class="card-meta">
       <span>${escapeHtml(article.source_id)}</span>
@@ -79,6 +88,8 @@ function render(article) {
     <div id="lang-panel-gr" class="hidden">${grContent}</div>
 
     <a class="card-text" href="${article.url}" target="_blank" rel="noopener noreferrer">View original source &rarr;</a>
+
+    ${entitiesHtml}
 
     <div class="card-section-label">Related Articles</div>
     <div class="related-list" id="related-list">${relatedHtml}</div>

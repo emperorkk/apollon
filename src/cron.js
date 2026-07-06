@@ -170,6 +170,23 @@ async function linkTopics(db, articleId, topicNames, allTopics) {
   return matched;
 }
 
+// Persists GPT's extracted people/orgs/locations so relate.js can link
+// articles that mention the same entity (see relate.js findEntityMatches) —
+// previously only entities.locations was used (geocoding) and people/orgs
+// were discarded entirely, so there was no keyword-based linking at all.
+async function insertEntities(db, articleId, entities) {
+  const rows = [
+    ...(entities?.people ?? []).map((name) => ['person', name]),
+    ...(entities?.orgs ?? []).map((name) => ['org', name]),
+    ...(entities?.locations ?? []).map((name) => ['location', name]),
+  ].filter(([, name]) => name);
+
+  if (!rows.length) return;
+
+  const stmt = db.prepare('INSERT INTO article_entities (article_id, entity_type, entity_name) VALUES (?, ?, ?)');
+  await db.batch(rows.map(([type, name]) => stmt.bind(articleId, type, name)));
+}
+
 async function finalizeArticle(env, db, pending, gptResult, allTopics) {
   const greeceFlag = pending.greece_flag || gptResult.greece_related ? 1 : 0;
 
@@ -190,6 +207,7 @@ async function finalizeArticle(env, db, pending, gptResult, allTopics) {
 
   await insertArticle(db, article);
   const matchedTopics = await linkTopics(db, article.id, gptResult.topics ?? [], allTopics);
+  await insertEntities(db, article.id, gptResult.entities);
 
   const failedGeocodes = await geocodeArticle(db, article.id, {
     subjectLocation: gptResult.subject_location ?? null,
@@ -198,7 +216,7 @@ async function finalizeArticle(env, db, pending, gptResult, allTopics) {
 
   const topicIds = matchedTopics.map((t) => t.id);
   const embedding = await embedArticle(env, article, topicIds);
-  await computeRelations(env, article, embedding, topicIds);
+  await computeRelations(env, article, embedding, topicIds, gptResult.entities);
   await maybeNotify(env, article, matchedTopics);
 
   return { failedGeocodes };
