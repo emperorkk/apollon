@@ -125,3 +125,17 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.wid-popup-source {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.wid-popup-source:hover {
+  color: var(--accent-strong);
+}

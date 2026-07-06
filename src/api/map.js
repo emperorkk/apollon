@@ -26,7 +26,7 @@ app.get('/', async (c) => {
   const sql = `
     SELECT
       l.article_id, l.place_name, l.lat, l.lng, l.is_subject,
-      a.title_en, a.title_orig, a.importance
+      a.title_en, a.title_orig, a.importance, a.url
     FROM article_locations l
     JOIN articles a ON a.id = l.article_id
     WHERE ${conditions.join(' AND ')}
@@ -56,6 +56,7 @@ app.get('/', async (c) => {
     return {
       article_id: r.article_id,
       title: r.title_en || r.title_orig,
+      url: r.url,
       place_name: r.place_name,
       lat: r.lat,
       lng: r.lng,

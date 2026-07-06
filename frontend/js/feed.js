@@ -110,6 +110,7 @@ function renderCard(article) {
       <span>&middot;</span>
       <span>${date}</span>
       ${article.greece_flag ? '<span>&middot; GR</span>' : ''}
+      <a class="feed-card-source" href="${article.url}" target="_blank" rel="noopener noreferrer" title="Open original source">&#8599;</a>
     </div>
     <div class="feed-card-title">${escapeHtml(article.title_en || article.title_orig)}</div>
     <div class="feed-card-summary">${escapeHtml(summary)}</div>
@@ -120,5 +121,6 @@ function renderCard(article) {
   `;
 
   el.addEventListener('click', () => openArticleCard(article.id));
+  el.querySelector('.feed-card-source').addEventListener('click', (e) => e.stopPropagation());
   return el;
 }

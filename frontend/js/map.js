@@ -87,7 +87,8 @@ async function loadMarkers() {
     const leafletMarker = L.marker([marker.lat, marker.lng], { icon: buildIcon(marker) });
     leafletMarker.bindPopup(
       `<div class="wid-popup-title" data-article="${marker.article_id}">${escapeHtml(marker.title ?? '')}</div>
-       <div class="wid-popup-meta">${escapeHtml(marker.place_name)} &middot; IMPORTANCE ${marker.importance}</div>`
+       <div class="wid-popup-meta">${escapeHtml(marker.place_name)} &middot; IMPORTANCE ${marker.importance}</div>
+       <a class="wid-popup-source" href="${marker.url}" target="_blank" rel="noopener noreferrer">Original source &rarr;</a>`
     );
     leafletMarker.on('popupopen', (e) => {
       const el = e.popup.getElement().querySelector('.wid-popup-title');

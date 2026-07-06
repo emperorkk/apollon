@@ -489,6 +489,16 @@ a {
   color: var(--text-faint);
 }
 
+.feed-card-source {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.feed-card-source:hover {
+  color: var(--accent);
+}
+
 .feed-card-title {
   font-size: 14px;
   font-weight: 600;
