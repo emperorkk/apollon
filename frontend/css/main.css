@@ -1012,6 +1012,70 @@ dialog::backdrop {
   backdrop-filter: blur(2px);
 }
 
+#legal-dialog {
+  width: min(640px, 92vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+
+.legal-notice-body {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.legal-notice-body p {
+  margin: 0 0 12px;
+}
+
+.legal-notice-body .card-section-label {
+  margin-top: 4px;
+}
+
+.legal-footer {
+  flex: 0 0 auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-map-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 5px 16px;
+  background: rgba(7, 11, 16, 0.92);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.legal-footer-link {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.legal-footer-link:hover {
+  color: var(--accent-strong);
+}
+
+@media (max-width: 720px) {
+  .legal-footer span {
+    display: none;
+  }
+}
+
 .form-field {
   display: flex;
   flex-direction: column;

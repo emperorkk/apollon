@@ -7,6 +7,7 @@ import { initAuth } from './auth.js';
 import { initPush } from './push.js';
 import { closeGraph } from './graph.js';
 import { initKeywords } from './keywords.js';
+import { ADMIN_EMAIL } from './config.js';
 
 function renderTopicFilters() {
   const nav = document.getElementById('topic-filters');
@@ -82,6 +83,13 @@ function wireDaysSlider() {
   });
 }
 
+function wireLegalNotice() {
+  const dialog = document.getElementById('legal-dialog');
+  document.getElementById('legal-contact-email').textContent = ADMIN_EMAIL;
+  document.getElementById('legal-notice-btn').addEventListener('click', () => dialog.showModal());
+  document.getElementById('legal-dialog-close').addEventListener('click', () => dialog.close());
+}
+
 function wireOverlayDismiss() {
   document.getElementById('scrim').addEventListener('click', () => {
     closeArticleCard();
@@ -111,6 +119,7 @@ async function bootstrap() {
   wireSearch();
   wireDaysSlider();
   wireOverlayDismiss();
+  wireLegalNotice();
 
   initMap('map');
   initFeed('feed-list');
