@@ -24,6 +24,42 @@ export function initMap(containerId) {
   setInterval(loadMarkers, AUTO_REFRESH_MS);
 }
 
+// Markers that share (near-)identical coordinates — e.g. two different
+// articles both geocoding to "Tehran" — render perfectly stacked, and the
+// larger/brighter/pulsing subject marker fully hides a smaller secondary
+// one sitting right underneath it. Nudge coincident markers apart in a
+// small circle so every one of them stays visible and clickable. A fixed
+// degree offset (rather than a pixel-projected one) is intentional: it
+// naturally spreads wider in on-screen pixels as you zoom in and shrinks
+// back down as you zoom out, matching what you'd want.
+const JITTER_DEGREES = 0.08;
+
+function jitterOverlapping(markers) {
+  const groups = new Map();
+  for (const m of markers) {
+    const key = `${m.lat.toFixed(3)},${m.lng.toFixed(3)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  }
+
+  const result = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    group.forEach((m, i) => {
+      const angle = (2 * Math.PI * i) / group.length;
+      result.push({
+        ...m,
+        lat: m.lat + JITTER_DEGREES * Math.sin(angle),
+        lng: m.lng + JITTER_DEGREES * Math.cos(angle),
+      });
+    });
+  }
+  return result;
+}
+
 function buildIcon(marker) {
   const size = marker.is_subject ? 22 : 11;
   const cls = `wid-marker ${marker.is_subject ? 'subject' : 'secondary'}`;
@@ -47,7 +83,7 @@ async function loadMarkers() {
 
   clusterGroup.clearLayers();
 
-  for (const marker of data.markers) {
+  for (const marker of jitterOverlapping(data.markers)) {
     const leafletMarker = L.marker([marker.lat, marker.lng], { icon: buildIcon(marker) });
     leafletMarker.bindPopup(
       `<div class="wid-popup-title" data-article="${marker.article_id}">${escapeHtml(marker.title ?? '')}</div>
