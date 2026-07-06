@@ -1,5 +1,5 @@
 import { apiGet } from './api.js';
-import { openArticleCard } from './card.js';
+import { openArticleCard, closeArticleCard } from './card.js';
 import { state, notify } from './state.js';
 
 let cy;
@@ -7,13 +7,24 @@ let currentArticleIds = [];
 let currentLabel = '';
 let listBtnWired = false;
 
+// Graph and article card are mutually exclusive full-panel views — the
+// graph modal's near-opaque backdrop was rendering on top of a still-open
+// card (both are "open" simultaneously by z-index alone), turning into an
+// unreadable dimmed mess. Closing whichever one isn't currently in focus
+// keeps exactly one visible at a time.
 function openModal() {
+  closeArticleCard();
   const modal = document.getElementById('graph-modal');
   const scrim = document.getElementById('scrim');
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   scrim.classList.add('visible');
   wireListButton();
+}
+
+async function openArticleFromGraph(articleId) {
+  await openArticleCard(articleId);
+  closeGraph();
 }
 
 function wireListButton() {
@@ -144,7 +155,7 @@ async function renderRelationGraph(rootId) {
     layout: { name: 'cose', animate: false },
   });
 
-  cy.on('tap', 'node', (evt) => openArticleCard(evt.target.id()));
+  cy.on('tap', 'node', (evt) => openArticleFromGraph(evt.target.id()));
   cy.on('dbltap', 'node', (evt) => renderRelationGraph(evt.target.id()));
 }
 
@@ -199,6 +210,6 @@ async function renderKeywordGraph(keyword) {
   });
 
   cy.on('tap', 'node', (evt) => {
-    if (evt.target.id() !== hubId) openArticleCard(evt.target.id());
+    if (evt.target.id() !== hubId) openArticleFromGraph(evt.target.id());
   });
 }

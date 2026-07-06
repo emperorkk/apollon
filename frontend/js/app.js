@@ -85,6 +85,7 @@ function wireDaysSlider() {
 function wireOverlayDismiss() {
   document.getElementById('scrim').addEventListener('click', () => {
     closeArticleCard();
+    closeGraph();
   });
   document.getElementById('graph-close').addEventListener('click', () => closeGraph());
   document.addEventListener('keydown', (e) => {
