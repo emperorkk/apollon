@@ -44,27 +44,33 @@
 }
 
 .wid-marker.subject {
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  /* A dark drop-shadow around the white halo keeps it visible even over
+     light-coloured tile areas (desert/snow/ice regions look pale after the
+     tile invert filter), where a pure white ring alone would wash out. */
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
   animation: wid-pulse-ring 1.8s ease-out infinite, wid-pulse-scale 1.8s ease-in-out infinite;
 }
 
 /* Persistent tight glow (always visible) layered under an expanding,
    brighter ring — a solid always-on core reads much better against the
-   dark map than a ring that fades all the way to transparent. */
+   dark map than a ring that fades all the way to transparent. Sized up
+   further so it stays discernible once zoomed in past cluster breakup,
+   which is the only point these individual markers are ever visible. */
 @keyframes wid-pulse-ring {
   0% {
     box-shadow:
-      0 0 14px 4px var(--marker-color, var(--accent)),
-      0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 90%, transparent);
+      0 0 18px 6px var(--marker-color, var(--accent)),
+      0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 95%, transparent);
   }
   70% {
     box-shadow:
-      0 0 14px 4px var(--marker-color, var(--accent)),
-      0 0 0 22px color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
+      0 0 18px 6px var(--marker-color, var(--accent)),
+      0 0 0 30px color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
   }
   100% {
     box-shadow:
-      0 0 14px 4px var(--marker-color, var(--accent)),
+      0 0 18px 6px var(--marker-color, var(--accent)),
       0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
   }
 }

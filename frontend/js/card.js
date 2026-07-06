@@ -31,21 +31,29 @@ export function closeArticleCard() {
   }
 }
 
-// EN/GR toggle behaviour per spec §14: English-source articles show the EN
-// summary by default with a GR placeholder (Phase 2); non-English-source
-// articles show the Greek synopsis by default with an EN translation note.
+// EN/GR toggle behaviour per spec §14. Driven by which field actually has
+// content, not by the declared source language — a language flag doesn't
+// guarantee which of summary_en/synopsis_gr GPT actually populated, so
+// checking the language instead of the data itself could show a "not
+// available yet" placeholder even when a real translation exists.
 function render(article) {
-  const isEnglishSource = article.language === 'en';
+  const hasEn = !!article.summary_en;
+  const hasGr = !!article.synopsis_gr;
   const date = new Date(article.pub_date).toLocaleString();
 
-  const enContent = isEnglishSource
-    ? `<p class="card-text">${escapeHtml(article.summary_en ?? '')}</p>`
+  const enContent = hasEn
+    ? `<p class="card-text">${escapeHtml(article.summary_en)}</p>`
     : `<p class="card-text">${escapeHtml(article.title_en ?? '')}</p>
        <p class="card-placeholder">Full English summary — Phase 2.</p>`;
 
-  const grContent = isEnglishSource
-    ? `<p class="card-placeholder">Η ελληνική σύνοψη θα είναι διαθέσιμη σύντομα.</p>`
-    : `<p class="card-text">${escapeHtml(article.synopsis_gr ?? '')}</p>`;
+  const grContent = hasGr
+    ? `<p class="card-text">${escapeHtml(article.synopsis_gr)}</p>`
+    : `<p class="card-placeholder">Η ελληνική σύνοψη θα είναι διαθέσιμη σύντομα.</p>`;
+
+  // Default to whichever tab has real content — a translated (non-English
+  // source) article should open straight to its Greek synopsis, not to an
+  // EN tab that's just a title + "coming later" placeholder.
+  const defaultLang = hasGr && !hasEn ? 'gr' : 'en';
 
   const topicsHtml = (article.topics ?? [])
     .map((t) => `<span class="topic-tag" style="--tag-color:${t.color_hex}">${escapeHtml(t.name)}</span>`)
@@ -88,11 +96,11 @@ function render(article) {
     ${importanceBarHtml(article.importance)}
 
     <div class="lang-toggle" id="lang-toggle">
-      <button type="button" class="active" data-lang="en">EN</button>
-      <button type="button" data-lang="gr">GR</button>
+      <button type="button" class="${defaultLang === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+      <button type="button" class="${defaultLang === 'gr' ? 'active' : ''}" data-lang="gr">GR</button>
     </div>
-    <div id="lang-panel-en">${enContent}</div>
-    <div id="lang-panel-gr" class="hidden">${grContent}</div>
+    <div id="lang-panel-en" class="${defaultLang === 'en' ? '' : 'hidden'}">${enContent}</div>
+    <div id="lang-panel-gr" class="${defaultLang === 'gr' ? '' : 'hidden'}">${grContent}</div>
 
     <a class="card-text" href="${article.url}" target="_blank" rel="noopener noreferrer">View original source &rarr;</a>
 

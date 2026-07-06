@@ -61,12 +61,22 @@ app.get('/', async (c) => {
 
   const conditions = [`a.pub_date >= datetime('now', ?)`];
   const binds = [`-${days} days`];
-  let from = 'articles a';
 
+  // Matches title/summary text (FTS5), named entity keywords
+  // (people/orgs/locations), and source name/id — so "BBC" or "Khamenei"
+  // finds articles even when that text isn't itself in the title/summary.
   if (q) {
-    from = 'articles_fts f JOIN articles a ON a.rowid = f.rowid';
-    conditions.push('articles_fts MATCH ?');
-    binds.push(q);
+    const like = `%${q}%`;
+    conditions.push(
+      `a.id IN (
+         SELECT a2.id FROM articles_fts f JOIN articles a2 ON a2.rowid = f.rowid WHERE articles_fts MATCH ?
+         UNION
+         SELECT ae.article_id FROM article_entities ae WHERE ae.entity_name LIKE ?
+         UNION
+         SELECT a3.id FROM articles a3 JOIN sources s ON s.id = a3.source_id WHERE s.name LIKE ? OR s.id LIKE ?
+       )`
+    );
+    binds.push(q, like, like, like);
   }
   if (topic) {
     conditions.push(
@@ -79,7 +89,7 @@ app.get('/', async (c) => {
     binds.push(region);
   }
 
-  const sql = `SELECT a.* FROM ${from} WHERE ${conditions.join(' AND ')} ORDER BY a.pub_date DESC, a.importance DESC LIMIT ? OFFSET ?`;
+  const sql = `SELECT a.* FROM articles a WHERE ${conditions.join(' AND ')} ORDER BY a.pub_date DESC, a.importance DESC LIMIT ? OFFSET ?`;
   const { results } = await db.prepare(sql).bind(...binds, limit, offset).all();
 
   const topicsByArticle = await attachTopics(db, results.map((r) => r.id));
