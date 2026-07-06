@@ -44,18 +44,38 @@
 }
 
 .wid-marker.subject {
-  animation: wid-pulse 2.2s ease-out infinite;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  animation: wid-pulse-ring 1.8s ease-out infinite, wid-pulse-scale 1.8s ease-in-out infinite;
 }
 
-@keyframes wid-pulse {
+/* Persistent tight glow (always visible) layered under an expanding,
+   brighter ring — a solid always-on core reads much better against the
+   dark map than a ring that fades all the way to transparent. */
+@keyframes wid-pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 55%, transparent);
+    box-shadow:
+      0 0 14px 4px var(--marker-color, var(--accent)),
+      0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 90%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 12px color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
+    box-shadow:
+      0 0 14px 4px var(--marker-color, var(--accent)),
+      0 0 0 22px color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
+    box-shadow:
+      0 0 14px 4px var(--marker-color, var(--accent)),
+      0 0 0 0 color-mix(in srgb, var(--marker-color, var(--accent)) 0%, transparent);
+  }
+}
+
+@keyframes wid-pulse-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
   }
 }
 

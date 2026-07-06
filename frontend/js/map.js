@@ -25,7 +25,7 @@ export function initMap(containerId) {
 }
 
 function buildIcon(marker) {
-  const size = marker.is_subject ? 18 : 11;
+  const size = marker.is_subject ? 22 : 11;
   const cls = `wid-marker ${marker.is_subject ? 'subject' : 'secondary'}`;
   return L.divIcon({
     className: '',
