@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { DEFAULT_FEED_DAYS, MAX_FEED_DAYS } from '../lib/constants.js';
+import { queryChunkedByIds } from '../lib/db.js';
 
 const app = new Hono();
 
@@ -34,21 +35,18 @@ app.get('/', async (c) => {
   const { results } = await db.prepare(sql).bind(...binds).all();
 
   const articleIds = [...new Set(results.map((r) => r.article_id))];
-  let topicsByArticle = new Map();
-  if (articleIds.length) {
-    const placeholders = articleIds.map(() => '?').join(',');
-    const { results: topicRows } = await db
-      .prepare(
-        `SELECT at2.article_id, t.id, t.name, t.color_hex, at2.confidence
-         FROM article_topics at2 JOIN topics t ON t.id = at2.topic_id
-         WHERE at2.article_id IN (${placeholders})
-         ORDER BY at2.confidence DESC`
-      )
-      .bind(...articleIds)
-      .all();
-    for (const row of topicRows) {
-      if (!topicsByArticle.has(row.article_id)) topicsByArticle.set(row.article_id, row);
-    }
+  const topicRows = await queryChunkedByIds(
+    db,
+    articleIds,
+    (placeholders) =>
+      `SELECT at2.article_id, t.id, t.name, t.color_hex, at2.confidence
+       FROM article_topics at2 JOIN topics t ON t.id = at2.topic_id
+       WHERE at2.article_id IN (${placeholders})
+       ORDER BY at2.confidence DESC`
+  );
+  const topicsByArticle = new Map();
+  for (const row of topicRows) {
+    if (!topicsByArticle.has(row.article_id)) topicsByArticle.set(row.article_id, row);
   }
 
   const markers = results.map((r) => {

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { DEFAULT_FEED_DAYS, MAX_FEED_DAYS } from '../lib/constants.js';
+import { queryChunkedByIds } from '../lib/db.js';
 
 const app = new Hono();
 
@@ -9,15 +10,14 @@ function clamp(n, min, max) {
 
 async function attachTopics(db, articleIds) {
   if (!articleIds.length) return new Map();
-  const placeholders = articleIds.map(() => '?').join(',');
-  const { results } = await db
-    .prepare(
+  const results = await queryChunkedByIds(
+    db,
+    articleIds,
+    (placeholders) =>
       `SELECT at2.article_id, t.id, t.name, t.color_hex
        FROM article_topics at2 JOIN topics t ON t.id = at2.topic_id
        WHERE at2.article_id IN (${placeholders})`
-    )
-    .bind(...articleIds)
-    .all();
+  );
 
   const map = new Map();
   for (const row of results) {
@@ -40,11 +40,8 @@ app.get('/', async (c) => {
     const ids = [...new Set(idsParam.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 200);
     if (!ids.length) return c.json({ articles: [], page: 1, limit: 0 });
 
-    const placeholders = ids.map(() => '?').join(',');
-    const { results } = await db
-      .prepare(`SELECT * FROM articles WHERE id IN (${placeholders}) ORDER BY pub_date DESC`)
-      .bind(...ids)
-      .all();
+    const results = await queryChunkedByIds(db, ids, (placeholders) => `SELECT * FROM articles WHERE id IN (${placeholders})`);
+    results.sort((a, b) => (a.pub_date < b.pub_date ? 1 : -1));
 
     const topicsByArticle = await attachTopics(db, results.map((r) => r.id));
     const articles = results.map((a) => ({ ...a, topics: topicsByArticle.get(a.id) ?? [] }));
