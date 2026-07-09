@@ -827,7 +827,8 @@ a {
   box-shadow: 0 0 14px var(--accent-soft);
 }
 
-#graph-container {
+#graph-container,
+#graph-container-3d {
   width: min(1100px, 94vw);
   height: min(720px, 84vh);
   border: 1px solid var(--border-strong);

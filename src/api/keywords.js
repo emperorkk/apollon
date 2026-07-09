@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { DEFAULT_FEED_DAYS, MAX_FEED_DAYS, GRAPH_MAX_NODES } from '../lib/constants.js';
+import { queryChunkedByIds } from '../lib/db.js';
 
 const app = new Hono();
+const MAX_LEVEL2_KEYWORDS = 30;
 
 function clamp(n, min, max) {
   return Math.min(Math.max(n, min), max);
@@ -34,20 +36,22 @@ app.get('/', async (c) => {
   return c.json({ keywords: results });
 });
 
-// GET /api/keywords/:name/graph — star graph for the Cytoscape modal: the
-// keyword at the centre, every matching article (within the window) as a
-// leaf node, per spec-adjacent request ("clicking a keyword opens the graph
-// with the tag and articles").
+// GET /api/keywords/:name/graph — 2-hop bipartite network for the 3D graph:
+// keyword -> articles mentioning it -> other people/orgs those articles
+// mention -> other articles mentioning those. Nodes are tagged type:
+// 'keyword' | 'article' so the frontend can render/color them distinctly.
 app.get('/:name/graph', async (c) => {
   const db = c.env.DB;
-  const name = c.req.param('name');
+  const rootKeyword = c.req.param('name');
   const days = clamp(
     parseInt(c.req.query('days') ?? String(DEFAULT_FEED_DAYS), 10) || DEFAULT_FEED_DAYS,
     1,
     MAX_FEED_DAYS
   );
+  const windowClause = `-${days} days`;
 
-  const { results: rows } = await db
+  // Level 1: articles mentioning the root keyword
+  const { results: level1Articles } = await db
     .prepare(
       `SELECT a.id, a.title_en, a.title_orig, a.importance
        FROM article_entities ae
@@ -56,36 +60,102 @@ app.get('/:name/graph', async (c) => {
        ORDER BY a.importance DESC
        LIMIT ?`
     )
-    .bind(name, `-${days} days`, GRAPH_MAX_NODES)
+    .bind(rootKeyword, windowClause, GRAPH_MAX_NODES)
     .all();
 
-  if (!rows.length) return c.json({ keyword: name, articles: [] });
+  if (!level1Articles.length) return c.json({ keyword: rootKeyword, nodes: [], edges: [] });
 
-  const ids = rows.map((r) => r.id);
-  const placeholders = ids.map(() => '?').join(',');
-  const { results: topicRows } = await db
-    .prepare(
+  const level1Ids = level1Articles.map((r) => r.id);
+  const level1IdSet = new Set(level1Ids);
+
+  // Level 2: other person/org entities mentioned across those same articles
+  const entityRows = await queryChunkedByIds(
+    db,
+    level1Ids,
+    (placeholders) =>
+      `SELECT article_id, entity_name FROM article_entities
+       WHERE entity_name != ? AND article_id IN (${placeholders}) AND entity_type IN ('person', 'org')`,
+    [rootKeyword]
+  );
+
+  const countByKeyword = new Map();
+  for (const row of entityRows) {
+    countByKeyword.set(row.entity_name, (countByKeyword.get(row.entity_name) ?? 0) + 1);
+  }
+  const level2Keywords = [...countByKeyword.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_LEVEL2_KEYWORDS)
+    .map(([name]) => name);
+
+  // Level 3: articles mentioning those level-2 keywords (within the window)
+  // — may include level-1 articles again (a real cross-link, kept as an
+  // extra edge) as well as genuinely new ones.
+  let level3Rows = [];
+  if (level2Keywords.length) {
+    const placeholders = level2Keywords.map(() => '?').join(',');
+    const { results } = await db
+      .prepare(
+        `SELECT ae.entity_name, a.id, a.title_en, a.title_orig, a.importance
+         FROM article_entities ae
+         JOIN articles a ON a.id = ae.article_id
+         WHERE ae.entity_name IN (${placeholders}) AND a.pub_date >= datetime('now', ?)
+         ORDER BY a.importance DESC
+         LIMIT ?`
+      )
+      .bind(...level2Keywords, windowClause, GRAPH_MAX_NODES * 3)
+      .all();
+    level3Rows = results;
+  }
+
+  const newArticlesById = new Map();
+  for (const row of level3Rows) {
+    if (!level1IdSet.has(row.id) && !newArticlesById.has(row.id)) {
+      newArticlesById.set(row.id, { id: row.id, title_en: row.title_en, title_orig: row.title_orig, importance: row.importance });
+    }
+  }
+
+  const allArticleRows = [...level1Articles, ...newArticlesById.values()];
+  const allArticleIds = allArticleRows.map((r) => r.id);
+
+  const topicRows = await queryChunkedByIds(
+    db,
+    allArticleIds,
+    (placeholders) =>
       `SELECT at2.article_id, t.color_hex, at2.confidence
        FROM article_topics at2 JOIN topics t ON t.id = at2.topic_id
        WHERE at2.article_id IN (${placeholders})
        ORDER BY at2.confidence DESC`
-    )
-    .bind(...ids)
-    .all();
-
+  );
   const colorByArticle = new Map();
   for (const row of topicRows) {
     if (!colorByArticle.has(row.article_id)) colorByArticle.set(row.article_id, row.color_hex);
   }
 
-  const articles = rows.map((r) => ({
-    id: r.id,
-    title: r.title_en || r.title_orig,
-    importance: r.importance,
-    color: colorByArticle.get(r.id) ?? '#8892a0',
-  }));
+  const nodes = [
+    { id: `kw:${rootKeyword}`, type: 'keyword', label: rootKeyword, root: true },
+    ...level2Keywords.map((name) => ({ id: `kw:${name}`, type: 'keyword', label: name, root: false })),
+    ...allArticleRows.map((r) => ({
+      id: r.id,
+      type: 'article',
+      label: r.title_en || r.title_orig,
+      importance: r.importance,
+      color: colorByArticle.get(r.id) ?? '#8892a0',
+    })),
+  ];
 
-  return c.json({ keyword: name, articles });
+  const edgeKeys = new Set();
+  const edges = [];
+  const addEdge = (source, target) => {
+    const key = `${source}|${target}`;
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push({ source, target });
+  };
+
+  for (const a of level1Articles) addEdge(`kw:${rootKeyword}`, a.id);
+  for (const row of level3Rows) addEdge(`kw:${row.entity_name}`, row.id);
+
+  return c.json({ keyword: rootKeyword, nodes, edges });
 });
 
 export default app;

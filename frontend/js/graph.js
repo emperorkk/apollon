@@ -2,7 +2,8 @@ import { apiGet } from './api.js';
 import { openArticleCard, closeArticleCard } from './card.js';
 import { state, notify } from './state.js';
 
-let cy;
+let cy; // Cytoscape instance — 2D relation graph
+let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)
 let currentArticleIds = [];
 let currentLabel = '';
 let listBtnWired = false;
@@ -20,6 +21,14 @@ function openModal() {
   modal.setAttribute('aria-hidden', 'false');
   scrim.classList.add('visible');
   wireListButton();
+}
+
+// The relation graph (2D/Cytoscape) and keyword network (3D) use separate
+// containers stacked in the same modal, since two different rendering
+// libraries can't safely share one DOM node — only one is shown at a time.
+function showContainer(which) {
+  document.getElementById('graph-container').classList.toggle('hidden', which !== '2d');
+  document.getElementById('graph-container-3d').classList.toggle('hidden', which !== '3d');
 }
 
 async function openArticleFromGraph(articleId) {
@@ -48,12 +57,14 @@ function setGraphResult(articleIds, label) {
 
 export async function openGraph(articleId) {
   openModal();
+  showContainer('2d');
   await renderRelationGraph(articleId);
 }
 
 export async function openKeywordGraph(keyword) {
   openModal();
-  await renderKeywordGraph(keyword);
+  showContainer('3d');
+  await renderKeywordNetwork(keyword);
 }
 
 export function closeGraph() {
@@ -71,6 +82,11 @@ function importanceToDiameter(importance) {
   const clamped = Math.min(Math.max(importance, 1), 10);
   return (20 + ((clamped - 1) / 9) * 40) * 2;
 }
+
+// ---------------------------------------------------------------------------
+// 2D relation graph (Cytoscape) — 2-hop article network (embedding
+// similarity + shared entities), opened via an article card's "View Graph".
+// ---------------------------------------------------------------------------
 
 // Edge labels (shared topic/keyword) are deliberately NOT rendered directly
 // on the graph — with many edges that turns into permanent visual noise.
@@ -141,10 +157,9 @@ function wireEdgeTooltips(cyInstance) {
   });
 }
 
-// 2-hop article relation graph (embedding similarity + shared entities),
-// opened via an article card's "View Graph" button. breadthfirst rooted at
-// the selected article naturally arranges hop-1/hop-2 nodes in clear rings
-// by distance from root, instead of cose's unstructured force-settle.
+// breadthfirst rooted at the selected article naturally arranges hop-1/
+// hop-2 nodes in clear rings by distance from root, instead of cose's
+// unstructured force-settle.
 async function renderRelationGraph(rootId) {
   let data;
   try {
@@ -201,65 +216,54 @@ async function renderRelationGraph(rootId) {
   cy.on('dbltap', 'node', (evt) => renderRelationGraph(evt.target.id()));
 }
 
-// Star graph for a keyword (named person/org entity): the keyword at the
-// centre, every matching article (last 5 days) as a leaf node — opened from
-// the keyword side panel. concentric with the hub forced to the innermost
-// ring gives a clean radial wheel instead of cose's asymmetric clumping.
-async function renderKeywordGraph(keyword) {
+// ---------------------------------------------------------------------------
+// 3D keyword network (3d-force-graph / Three.js) — 2-hop bipartite mesh:
+// keyword -> articles mentioning it -> other people/orgs those articles
+// mention -> other articles mentioning those. Opened from the keyword side
+// panel.
+// ---------------------------------------------------------------------------
+
+function getGraph3D() {
+  if (graph3D) return graph3D;
+
+  graph3D = ForceGraph3D()(document.getElementById('graph-container-3d'))
+    .backgroundColor('#04070a')
+    .nodeLabel((node) => node.label)
+    .nodeVal((node) => (node.type === 'keyword' ? (node.root ? 14 : 7) : Math.max(3, node.importance ?? 3)))
+    .nodeColor((node) => {
+      if (node.type === 'keyword') return node.root ? '#4fd8e8' : '#f2c14e';
+      return node.color ?? '#8892a0';
+    })
+    .linkColor(() => 'rgba(220, 228, 235, 0.25)')
+    .linkWidth(0.6)
+    .onNodeClick((node) => {
+      if (node.type === 'article') {
+        openArticleFromGraph(node.id);
+      } else {
+        renderKeywordNetwork(node.label);
+      }
+    });
+
+  return graph3D;
+}
+
+async function renderKeywordNetwork(keyword) {
   let data;
   try {
     data = await apiGet(`/keywords/${encodeURIComponent(keyword)}/graph`);
   } catch (err) {
-    console.error('Failed to load keyword graph', err);
+    console.error('Failed to load keyword network', err);
     return;
   }
 
   setGraphResult(
-    data.articles.map((a) => a.id),
+    data.nodes.filter((n) => n.type === 'article').map((n) => n.id),
     keyword
   );
 
-  const hubId = `__keyword__${keyword}`;
-  const elements = [
-    { data: { id: hubId, label: keyword, size: 56, color: '#4fd8e8' } },
-    ...data.articles.map((a) => ({
-      data: { id: a.id, label: a.title ?? '', size: importanceToDiameter(a.importance), color: a.color },
-    })),
-    ...data.articles.map((a) => ({
-      data: { id: `${hubId}__${a.id}`, source: hubId, target: a.id, similarity: 1 },
-    })),
-  ];
-
-  if (cy) cy.destroy();
-
-  cy = cytoscape({
-    container: document.getElementById('graph-container'),
-    elements,
-    style: [
-      ...baseCytoscapeStyle(),
-      {
-        selector: `node[id = "${hubId}"]`,
-        style: {
-          shape: 'diamond',
-          'background-color': '#4fd8e8',
-          'border-width': 3,
-          'border-color': '#8fecf7',
-          'font-size': 11,
-          'font-weight': 600,
-        },
-      },
-    ],
-    layout: {
-      name: 'concentric',
-      concentric: (node) => (node.id() === hubId ? 2 : 1),
-      levelWidth: () => 1,
-      minNodeSpacing: 55,
-      animate: false,
-    },
-  });
-
-  wireEdgeTooltips(cy);
-  cy.on('tap', 'node', (evt) => {
-    if (evt.target.id() !== hubId) openArticleFromGraph(evt.target.id());
+  const graph = getGraph3D();
+  graph.graphData({
+    nodes: data.nodes,
+    links: data.edges.map((e) => ({ source: e.source, target: e.target })),
   });
 }
