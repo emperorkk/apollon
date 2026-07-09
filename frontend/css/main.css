@@ -836,6 +836,28 @@ a {
   position: relative;
 }
 
+.graph-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background: var(--panel-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--accent-strong);
+  white-space: nowrap;
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.graph-tooltip.hidden {
+  display: none;
+}
+
 /* HUD corner brackets, used sparingly for framed panels */
 .hud-frame {
   position: relative;

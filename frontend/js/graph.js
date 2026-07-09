@@ -72,6 +72,11 @@ function importanceToDiameter(importance) {
   return (20 + ((clamped - 1) / 9) * 40) * 2;
 }
 
+// Edge labels (shared topic/keyword) are deliberately NOT rendered directly
+// on the graph — with many edges that turns into permanent visual noise.
+// They're kept in edge data and surfaced via a lightweight hover tooltip
+// instead (wireEdgeTooltips), so the graph stays clean by default but the
+// "why are these connected" info is still one hover away.
 function baseCytoscapeStyle() {
   return [
     {
@@ -86,8 +91,8 @@ function baseCytoscapeStyle() {
         'font-family': 'ui-monospace, monospace',
         'text-valign': 'bottom',
         'text-margin-y': 6,
-        'text-wrap': 'ellipsis',
-        'text-max-width': '120px',
+        'text-wrap': 'wrap',
+        'text-max-width': '150px',
         'border-width': 2,
         'border-color': 'rgba(255,255,255,0.15)',
       },
@@ -98,19 +103,48 @@ function baseCytoscapeStyle() {
         width: 'mapData(similarity, 0.85, 1, 1, 6)',
         'line-color': '#29333f',
         'target-arrow-shape': 'none',
-        label: 'data(label)',
-        'font-size': 8,
-        color: '#8493a3',
-        'text-background-color': '#0d1218',
-        'text-background-opacity': 0.8,
         'curve-style': 'bezier',
       },
     },
   ];
 }
 
+function ensureTooltip() {
+  const container = document.getElementById('graph-container');
+  let tooltip = container.querySelector('.graph-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'graph-tooltip hidden';
+    container.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+// Shows an edge's shared-topic/keyword label on hover instead of always on.
+function wireEdgeTooltips(cyInstance) {
+  const tooltip = ensureTooltip();
+
+  cyInstance.on('mouseover', 'edge', (evt) => {
+    const label = evt.target.data('label');
+    if (!label) return;
+    tooltip.textContent = label;
+    tooltip.classList.remove('hidden');
+  });
+
+  cyInstance.on('mouseout', 'edge', () => tooltip.classList.add('hidden'));
+
+  cyInstance.on('mousemove', (evt) => {
+    if (tooltip.classList.contains('hidden')) return;
+    const pos = evt.renderedPosition ?? evt.position;
+    tooltip.style.left = `${pos.x + 14}px`;
+    tooltip.style.top = `${pos.y + 10}px`;
+  });
+}
+
 // 2-hop article relation graph (embedding similarity + shared entities),
-// opened via an article card's "View Graph" button.
+// opened via an article card's "View Graph" button. breadthfirst rooted at
+// the selected article naturally arranges hop-1/hop-2 nodes in clear rings
+// by distance from root, instead of cose's unstructured force-settle.
 async function renderRelationGraph(rootId) {
   let data;
   try {
@@ -152,16 +186,25 @@ async function renderRelationGraph(rootId) {
         style: { 'border-width': 3, 'border-color': '#4fd8e8' },
       },
     ],
-    layout: { name: 'cose', animate: false },
+    layout: {
+      name: 'breadthfirst',
+      roots: [rootId],
+      directed: false,
+      spacingFactor: 1.5,
+      avoidOverlap: true,
+      animate: false,
+    },
   });
 
+  wireEdgeTooltips(cy);
   cy.on('tap', 'node', (evt) => openArticleFromGraph(evt.target.id()));
   cy.on('dbltap', 'node', (evt) => renderRelationGraph(evt.target.id()));
 }
 
 // Star graph for a keyword (named person/org entity): the keyword at the
 // centre, every matching article (last 5 days) as a leaf node — opened from
-// the keyword side panel.
+// the keyword side panel. concentric with the hub forced to the innermost
+// ring gives a clean radial wheel instead of cose's asymmetric clumping.
 async function renderKeywordGraph(keyword) {
   let data;
   try {
@@ -206,9 +249,16 @@ async function renderKeywordGraph(keyword) {
         },
       },
     ],
-    layout: { name: 'cose', animate: false },
+    layout: {
+      name: 'concentric',
+      concentric: (node) => (node.id() === hubId ? 2 : 1),
+      levelWidth: () => 1,
+      minNodeSpacing: 55,
+      animate: false,
+    },
   });
 
+  wireEdgeTooltips(cy);
   cy.on('tap', 'node', (evt) => {
     if (evt.target.id() !== hubId) openArticleFromGraph(evt.target.id());
   });
