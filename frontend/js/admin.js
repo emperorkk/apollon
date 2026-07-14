@@ -40,6 +40,41 @@ async function loadStats() {
     .join('')}</div>`;
 }
 
+function formatPendingError(p) {
+  if (!p.error_message) return '<span class="card-placeholder">—</span>';
+  return `<span title="${escapeHtml(p.error_message)}">${escapeHtml(p.error_message.slice(0, 80))}${p.error_message.length > 80 ? '…' : ''}</span>`;
+}
+
+async function loadFailedIngestions() {
+  const { pending_articles: rows } = await apiGet('/admin/pending-articles', { status: 'failed' }, state.token);
+
+  if (!rows.length) {
+    return '<p class="card-placeholder">No failed ingestions.</p>';
+  }
+
+  const tableRows = rows
+    .map(
+      (p) => `
+    <tr>
+      <td><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.title_orig || p.guid)}</a></td>
+      <td>${escapeHtml(p.source_name ?? p.source_id ?? '')}</td>
+      <td>${formatPendingError(p)}</td>
+      <td>${new Date(p.created_at).toLocaleString()}</td>
+      <td>
+        <button type="button" class="btn-ghost" data-retry-pending="${p.id}">Retry</button>
+        <button type="button" class="btn-ghost" data-discard-pending="${p.id}">Discard</button>
+      </td>
+    </tr>`
+    )
+    .join('');
+
+  return `
+    <table class="data-table">
+      <thead><tr><th>Article</th><th>Source</th><th>Error</th><th>Failed At</th><th></th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>`;
+}
+
 async function loadTopics() {
   const { topics } = await apiGet('/admin/topics', {}, state.token);
   const rows = topics
@@ -110,6 +145,14 @@ async function renderAdmin() {
 
     <section class="admin-section">
       <div class="admin-section-header">
+        <span class="admin-section-title">Failed Ingestions</span>
+        <button type="button" class="btn-primary" id="retry-all-btn">Retry All</button>
+      </div>
+      <div id="failed-container">Loading&hellip;</div>
+    </section>
+
+    <section class="admin-section">
+      <div class="admin-section-header">
         <span class="admin-section-title">Topics</span>
         <button type="button" class="btn-primary" id="add-topic-btn">+ Add Topic</button>
       </div>
@@ -125,14 +168,63 @@ async function renderAdmin() {
     </section>
   `;
 
-  const [statsHtml, topicsHtml, sourcesHtml] = await Promise.all([loadStats(), loadTopics(), loadSources()]);
+  const [statsHtml, failedHtml, topicsHtml, sourcesHtml] = await Promise.all([
+    loadStats(),
+    loadFailedIngestions(),
+    loadTopics(),
+    loadSources(),
+  ]);
   document.getElementById('stats-container').innerHTML = statsHtml;
+  document.getElementById('failed-container').innerHTML = failedHtml;
   document.getElementById('topics-container').innerHTML = topicsHtml;
   document.getElementById('sources-container').innerHTML = sourcesHtml;
 
   wireTopicActions();
   wireSourceActions();
   wireCronButton();
+  wireFailedIngestionActions();
+}
+
+function wireFailedIngestionActions() {
+  document.getElementById('retry-all-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const { retried } = await apiPost('/admin/pending-articles/retry-all', {}, state.token);
+      btn.textContent = `Retried ${retried}`;
+      await renderAdmin();
+    } catch (err) {
+      console.error('Failed to retry all', err);
+      btn.disabled = false;
+    }
+  });
+
+  document.querySelectorAll('[data-retry-pending]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await apiPost(`/admin/pending-articles/${btn.dataset.retryPending}/retry`, {}, state.token);
+        renderAdmin();
+      } catch (err) {
+        console.error('Failed to retry article', err);
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-discard-pending]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Permanently discard this failed article?')) return;
+      btn.disabled = true;
+      try {
+        await apiDelete(`/admin/pending-articles/${btn.dataset.discardPending}`, {}, state.token);
+        renderAdmin();
+      } catch (err) {
+        console.error('Failed to discard article', err);
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 function wireCronButton() {
