@@ -92,6 +92,41 @@ export async function cacheGeocode(db, placeName, lat, lng) {
     .run();
 }
 
+// Removes an article and everything referencing it (topics, locations,
+// entities, relations, FTS index entry). Returns false if the article
+// didn't exist. Shared by the admin delete-article endpoint and by
+// finalizeArticle's retry-safety cleanup (see cron.js) — a finalize that
+// throws partway through (e.g. in computeRelations) can leave the articles
+// row already inserted while pending_articles is still marked 'failed';
+// without this, retrying hits `UNIQUE constraint failed: articles.guid`.
+// Does NOT touch Vectorize — callers that also need to remove the
+// embedding should do so separately (finalizeArticle's retry path doesn't
+// need to: embedArticle's upsert overwrites the same id).
+export async function deleteArticleCascade(db, id) {
+  const article = await db
+    .prepare('SELECT rowid, title_en, title_orig, summary_en FROM articles WHERE id = ?')
+    .bind(id)
+    .first();
+  if (!article) return false;
+
+  // articles_fts is an external-content FTS5 table; rows can't just be
+  // DELETEd from it directly — the documented way is the special 'delete'
+  // command, which needs the old column values to correctly unindex them.
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO articles_fts(articles_fts, rowid, title_en, title_orig, summary_en) VALUES ('delete', ?, ?, ?, ?)`
+      )
+      .bind(article.rowid, article.title_en, article.title_orig, article.summary_en),
+    db.prepare('DELETE FROM article_topics WHERE article_id = ?').bind(id),
+    db.prepare('DELETE FROM article_locations WHERE article_id = ?').bind(id),
+    db.prepare('DELETE FROM article_entities WHERE article_id = ?').bind(id),
+    db.prepare('DELETE FROM article_relations WHERE article_a = ? OR article_b = ?').bind(id, id),
+    db.prepare('DELETE FROM articles WHERE id = ?').bind(id),
+  ]);
+  return true;
+}
+
 export async function getUserByEmail(db, email) {
   return db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
 }

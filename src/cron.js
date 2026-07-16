@@ -1,4 +1,4 @@
-import { getActiveSources, getActiveTopics } from './lib/db.js';
+import { getActiveSources, getActiveTopics, deleteArticleCascade } from './lib/db.js';
 import { fetchNewArticles } from './pipeline/ingest.js';
 import { submitBatch, getBatchStatus, downloadBatchResults } from './pipeline/batch.js';
 import { geocodeArticle } from './pipeline/geocode.js';
@@ -188,6 +188,14 @@ async function insertEntities(db, articleId, entities) {
 }
 
 async function finalizeArticle(env, db, pending, gptResult, allTopics) {
+  // A previous attempt for this same pending row can have thrown partway
+  // through (e.g. computeRelations hitting D1's bound-parameter cap) after
+  // insertArticle already succeeded — pending_articles ends up 'failed'
+  // while the articles row (and its FTS entry) is already there. Clear any
+  // such leftover before redoing the insert so a retry doesn't hit
+  // `UNIQUE constraint failed: articles.guid`.
+  await deleteArticleCascade(db, pending.id);
+
   const greeceFlag = pending.greece_flag || gptResult.greece_related ? 1 : 0;
 
   const article = {
