@@ -46,11 +46,16 @@ with exactly these fields:
   "synopsis_gr":      string,   // 80-100 word Greek summary (translate + summarise in one step)
   "topics":           string[], // from allowed list injected below
   "entities": {
+    // Give every name in its most common English form (e.g. "US", not
+    // its ${language} transliteration) — these feed a cross-article
+    // keyword index shared with English-source articles, so names must
+    // be in a common language to link up rather than fragmenting by
+    // source language or script.
     "people":         string[],
     "orgs":           string[],
     "locations":      string[]
   },
-  "subject_location": string | null,
+  "subject_location": string | null, // also in English, same reason as entities above
   "importance":       number,   // 1-10 (see scale below)
   "greece_related":   boolean
 }
