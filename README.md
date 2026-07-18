@@ -80,7 +80,7 @@ Authorized JavaScript origins. The client ID is not secret — put it in
 ### 5. Verify
 
 - Visit the Worker's domain: map + feed should populate once the first cron
-  run (`*/30 * * * *`) has ingested articles.
+  run (`*/5 * * * *`) has ingested articles.
 - Sign in with `kkourentzes@gmail.com` and confirm the **ADMIN** link appears
   in the header, linking to `/admin.html`.
 

@@ -4,7 +4,7 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["*/5 * * * *"]
 
 # Serves frontend/ directly from this Worker (no separate Pages project).
 # Requests matching a real file in frontend/ are served directly; anything

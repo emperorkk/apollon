@@ -232,8 +232,15 @@ async function finalizeArticle(env, db, pending, gptResult, allTopics) {
 
 async function finalizeReadyArticles(env, db) {
   const topics = await getActiveTopics(db);
+  // Newest first: with more 'ready' articles than MAX_FINALIZE_PER_RUN can
+  // drain in one tick, an unordered (effectively FIFO-by-rowid) select left
+  // today's news stuck behind a growing backlog of old queued articles —
+  // the feed's day-window filter (pub_date-based) never saw anything recent
+  // even though articles were finalizing every tick. Draining newest-first
+  // means the site stays current while the backlog empties in the
+  // background.
   const { results: ready } = await db
-    .prepare('SELECT * FROM pending_articles WHERE status = \'ready\' LIMIT ?')
+    .prepare('SELECT * FROM pending_articles WHERE status = \'ready\' ORDER BY pub_date DESC LIMIT ?')
     .bind(MAX_FINALIZE_PER_RUN)
     .all();
 
