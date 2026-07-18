@@ -25,19 +25,29 @@ app.get('/', async (c) => {
   return c.json({ pending_articles: results });
 });
 
-// POST /api/admin/pending-articles/:id/retry — reset one failed article back
-// to 'queued' so the next cron tick (or a manual "Run Ingestion Now") picks
-// it up and resubmits it through the batch pipeline. The original RSS body
-// is still stored on the row, so this doesn't need to refetch the source.
+// A 'failed' row can have gotten there two different ways: a genuine
+// OpenAI/batch failure (syncBatchStatuses caught an error, gpt_result was
+// never populated) or an exception thrown by finalizeArticle *after* GPT
+// already succeeded (gpt_result IS populated — see cron.js's finalize catch
+// block, which only flips status, never clears it). Only the first kind
+// needs to go back through the OpenAI batch queue; the second kind can — and
+// should — go straight back to 'ready' so the very next cron tick re-runs
+// (now-fixed) finalize immediately instead of waiting on a whole new batch
+// submit/poll cycle (minutes to the full BATCH_COMPLETION_WINDOW).
+const RETRY_SQL = `
+  UPDATE pending_articles
+  SET
+    status = CASE WHEN gpt_result IS NOT NULL THEN 'ready' ELSE 'queued' END,
+    error_message = NULL,
+    batch_id = CASE WHEN gpt_result IS NOT NULL THEN batch_id ELSE NULL END
+  WHERE status = 'failed'`;
+
+// POST /api/admin/pending-articles/:id/retry — see RETRY_SQL above for how
+// the target status is chosen. The original RSS body (and gpt_result, when
+// present) is still stored on the row either way.
 app.post('/:id/retry', async (c) => {
   const id = c.req.param('id');
-  const { meta } = await c.env.DB.prepare(
-    `UPDATE pending_articles
-     SET status = 'queued', error_message = NULL, gpt_result = NULL, batch_id = NULL
-     WHERE id = ? AND status = 'failed'`
-  )
-    .bind(id)
-    .run();
+  const { meta } = await c.env.DB.prepare(`${RETRY_SQL} AND id = ?`).bind(id).run();
 
   if (!meta.changes) return c.json({ error: 'Not found or not failed' }, 404);
   return c.json({ ok: true });
@@ -45,11 +55,7 @@ app.post('/:id/retry', async (c) => {
 
 // POST /api/admin/pending-articles/retry-all — bulk version of the above.
 app.post('/retry-all', async (c) => {
-  const { meta } = await c.env.DB.prepare(
-    `UPDATE pending_articles
-     SET status = 'queued', error_message = NULL, gpt_result = NULL, batch_id = NULL
-     WHERE status = 'failed'`
-  ).run();
+  const { meta } = await c.env.DB.prepare(RETRY_SQL).run();
 
   return c.json({ ok: true, retried: meta.changes });
 });
