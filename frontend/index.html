@@ -85,7 +85,13 @@
       <button class="graph-list-btn" id="graph-view-list" type="button" hidden>VIEW AS LIST</button>
       <button class="graph-close" id="graph-close" type="button">&times; CLOSE</button>
       <div id="graph-container"></div>
-      <div id="graph-container-3d" class="hidden"></div>
+      <div id="graph-container-3d" class="hidden">
+        <div class="graph-3d-legend">
+          <span><span class="legend-dot" style="background:#4fd8e8"></span>Root keyword</span>
+          <span><span class="legend-dot" style="background:#f2c14e"></span>Related keyword</span>
+          <span><span class="legend-dot" style="background:#8892a0"></span>Article</span>
+        </div>
+      </div>
     </div>
 
     <footer class="legal-footer">
@@ -144,6 +150,7 @@
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.38.1/dist/3d-force-graph.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three-spritetext@1.9.3/dist/three-spritetext.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script type="module" src="/js/app.js"></script>

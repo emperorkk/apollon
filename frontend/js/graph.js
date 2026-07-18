@@ -223,6 +223,36 @@ async function renderRelationGraph(rootId) {
 // panel.
 // ---------------------------------------------------------------------------
 
+function truncateLabel(text, max) {
+  if (!text) return '';
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+// nodeLabel's hover tooltip meant only one node at a time was ever
+// readable — for a sparse graph (a handful of nodes) that's basically
+// useless, you had to hunt around hovering each ball to see what anything
+// was. A floating SpriteText above every node makes the whole graph
+// readable at a glance instead. nodeThreeObjectExtend keeps the default
+// sphere (still used for color/size/click target) and adds this as an
+// extra object at the same node position, offset upward so it doesn't
+// overlap the sphere.
+function makeNodeSprite(node) {
+  const isRoot = node.type === 'keyword' && node.root;
+  const text = node.type === 'article' ? truncateLabel(node.label, 34) : node.label;
+
+  const sprite = new SpriteText(text);
+  sprite.color = node.type === 'keyword' ? (isRoot ? '#4fd8e8' : '#f2c14e') : '#dce4eb';
+  sprite.textHeight = isRoot ? 5 : node.type === 'keyword' ? 4 : 3;
+  sprite.backgroundColor = 'rgba(4, 7, 10, 0.7)';
+  sprite.padding = 2;
+  sprite.borderRadius = 2;
+  sprite.fontFace = 'ui-monospace, monospace';
+
+  const sphereRadius = node.type === 'keyword' ? (isRoot ? 14 : 7) : Math.max(3, node.importance ?? 3);
+  sprite.position.set(0, sphereRadius + 4, 0);
+  return sprite;
+}
+
 function getGraph3D() {
   if (graph3D) return graph3D;
 
@@ -234,6 +264,8 @@ function getGraph3D() {
       if (node.type === 'keyword') return node.root ? '#4fd8e8' : '#f2c14e';
       return node.color ?? '#8892a0';
     })
+    .nodeThreeObjectExtend(true)
+    .nodeThreeObject(makeNodeSprite)
     .linkColor(() => 'rgba(220, 228, 235, 0.25)')
     .linkWidth(0.6)
     .onNodeClick((node) => {
@@ -243,6 +275,15 @@ function getGraph3D() {
         renderKeywordNetwork(node.label);
       }
     });
+
+  // Slightly stronger repulsion + longer link distance than the library
+  // default: with permanent labels above every node now, cramped default
+  // spacing meant sprites overlapped each other on anything but the
+  // sparsest graphs. d3Force(name) (single arg) returns the live d3-force
+  // instance to tune directly, rather than needing d3-force as a separate
+  // dependency just for forceManyBody().
+  graph3D.d3Force('charge').strength(-160);
+  graph3D.d3Force('link').distance(70);
 
   return graph3D;
 }
@@ -266,4 +307,11 @@ async function renderKeywordNetwork(keyword) {
     nodes: data.nodes,
     links: data.edges.map((e) => ({ source: e.source, target: e.target })),
   });
+
+  // Camera keeps whatever position/zoom it had from the previous graph
+  // (or the library default on first open) otherwise — looks arbitrary
+  // for a brand new node set, especially a small one like a single
+  // keyword's immediate neighborhood. Let the force layout settle
+  // briefly, then frame everything.
+  setTimeout(() => graph.zoomToFit(400, 60), 350);
 }
