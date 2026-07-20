@@ -1,6 +1,14 @@
 import { apiGet } from './api.js';
 import { openArticleCard, closeArticleCard } from './card.js';
 import { state, notify } from './state.js';
+// Loaded as an ES module import (not a classic <script> global) because
+// three-spritetext's UMD build expects a global `THREE` object to already
+// exist — but 3d-force-graph bundles its own internal Three.js instance
+// rather than exposing one on window, so the global build throws
+// "can't access property CanvasTexture, t is undefined". Importing from
+// esm.sh instead resolves its own 'three' dependency correctly; this is
+// the same pattern used in 3d-force-graph's own official text-nodes example.
+import SpriteText from 'https://esm.sh/three-spritetext';
 
 let cy; // Cytoscape instance — 2D relation graph
 let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)
