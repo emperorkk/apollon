@@ -1,6 +1,6 @@
 {
   "name": "world-intelligence-dashboard",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Global news aggregation & intelligence dashboard on Cloudflare Workers",
   "private": true,
   "type": "module",
