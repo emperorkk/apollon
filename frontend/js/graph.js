@@ -265,6 +265,14 @@ function makeNodeSprite(node) {
 
   const sphereRadius = node.type === 'keyword' ? (isRoot ? 14 : 7) : Math.max(3, node.importance ?? 3);
   sprite.position.set(0, sphereRadius + 4, 0);
+
+  // Labels float above their node and can visually/spatially overlap a
+  // *different*, nearby node in a cramped layout — without this, clicking
+  // what looks like one node's sphere can actually raycast-hit a
+  // neighboring node's label instead (e.g. clicking a story only to land
+  // on an adjacent keyword's graph). Only the sphere itself should ever
+  // be a click target.
+  sprite.raycast = () => {};
   return sprite;
 }
 
