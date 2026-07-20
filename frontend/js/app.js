@@ -7,7 +7,9 @@ import { initAuth } from './auth.js';
 import { initPush } from './push.js';
 import { closeGraph } from './graph.js';
 import { initKeywords } from './keywords.js';
-import { ADMIN_EMAIL } from './config.js';
+import { ADMIN_EMAIL, APP_VERSION } from './config.js';
+
+const PRIVACY_ACK_KEY = 'apollon_privacy_ack_v1';
 
 function renderTopicFilters() {
   const nav = document.getElementById('topic-filters');
@@ -90,6 +92,34 @@ function wireLegalNotice() {
   document.getElementById('legal-dialog-close').addEventListener('click', () => dialog.close());
 }
 
+// First-visit notice (spec-independent, requested separately): Apollon sets
+// no tracking cookies, but Cloudflare-level bot protection does log the
+// requesting IP, so visitors are told that explicitly before using the
+// site rather than it being buried only in the legal notice. Persisted in
+// localStorage (not a cookie) so it only shows once per browser.
+function wirePrivacyNotice() {
+  const dialog = document.getElementById('privacy-dialog');
+
+  document.getElementById('privacy-dialog-ack').addEventListener('click', () => {
+    localStorage.setItem(PRIVACY_ACK_KEY, '1');
+    dialog.close();
+  });
+
+  document.getElementById('privacy-dialog-details').addEventListener('click', () => {
+    localStorage.setItem(PRIVACY_ACK_KEY, '1');
+    dialog.close();
+    document.getElementById('legal-dialog').showModal();
+  });
+
+  if (!localStorage.getItem(PRIVACY_ACK_KEY)) {
+    dialog.showModal();
+  }
+}
+
+function renderVersion() {
+  document.getElementById('brand-version').textContent = APP_VERSION;
+}
+
 function wireOverlayDismiss() {
   document.getElementById('scrim').addEventListener('click', () => {
     closeArticleCard();
@@ -115,11 +145,13 @@ async function bootstrap() {
 
   renderTopicFilters();
   renderMapLegend();
+  renderVersion();
   await populateRegions();
   wireSearch();
   wireDaysSlider();
   wireOverlayDismiss();
   wireLegalNotice();
+  wirePrivacyNotice();
 
   initMap('map');
   initFeed('feed-list');

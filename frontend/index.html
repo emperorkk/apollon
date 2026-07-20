@@ -23,6 +23,7 @@
         <span class="brand-mark">&#9670;</span>
         <span class="brand-name">APOLLON</span>
         <span class="brand-sub">World Intelligence Dashboard</span>
+        <span class="brand-version" id="brand-version"></span>
       </div>
 
       <nav class="topic-filters" id="topic-filters" aria-label="Topic filters"></nav>
@@ -140,9 +141,36 @@
         can contact <span id="legal-contact-email"></span> and the article in
         question will be reviewed promptly.
       </p>
+      <p class="card-section-label">Privacy &amp; IP logging</p>
+      <p>
+        Apollon does not use tracking cookies, analytics, or advertising trackers of
+        any kind, and does not build profiles of visitors. The only thing logged
+        about a visit is the IP address used to reach the service, and it is used
+        exclusively for automated bot protection (rate-limiting and firewall rules) &mdash;
+        never for tracking, analytics, or identifying individual visitors.
+      </p>
     </div>
     <div class="dialog-actions">
       <button type="button" class="btn-primary" id="legal-dialog-close">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="privacy-dialog">
+    <div class="admin-section-title" style="margin-bottom:14px;">Before You Continue</div>
+    <div class="legal-notice-body">
+      <p>
+        Apollon does not use tracking cookies, analytics, or advertising trackers of
+        any kind.
+      </p>
+      <p>
+        The only thing logged about your visit is the IP address used to reach this
+        service &mdash; used exclusively for automated bot protection (rate-limiting
+        and firewall rules), never to track, profile, or identify visitors.
+      </p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="legal-footer-link" id="privacy-dialog-details">Read full legal notice</button>
+      <button type="button" class="btn-primary" id="privacy-dialog-ack">Got it</button>
     </div>
   </dialog>
 

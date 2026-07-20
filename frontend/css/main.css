@@ -248,6 +248,23 @@ a {
   }
 }
 
+.brand-version {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .brand-version {
+    display: inline;
+  }
+}
+
 .topic-filters {
   display: flex;
   gap: 6px;
@@ -1066,6 +1083,15 @@ dialog::backdrop {
   width: min(640px, 92vw);
   max-height: 84vh;
   overflow-y: auto;
+}
+
+#privacy-dialog {
+  width: min(460px, 92vw);
+}
+
+#privacy-dialog .dialog-actions {
+  justify-content: space-between;
+  align-items: center;
 }
 
 .legal-notice-body {
