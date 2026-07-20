@@ -15,6 +15,20 @@
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/map.css" />
+
+  <!--
+    3d-force-graph and three-spritetext (both imported as ES modules in
+    graph.js, with three externalized via esm.sh's ?external=three) each
+    depend on Three.js. Without this, esm.sh would bundle a separate copy
+    of Three.js into each, and having two independent Three.js instances
+    on the page triggers "THREE.WARNING: Multiple instances of Three.js
+    being imported" — this import map makes both resolve the bare
+    "three" specifier to the exact same module, so only one instance is
+    ever loaded.
+  -->
+  <script type="importmap">
+    { "imports": { "three": "https://esm.sh/three@0.185.1" } }
+  </script>
 </head>
 <body>
   <div id="app">
@@ -177,7 +191,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.0/dist/3d-force-graph.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script type="module" src="/js/app.js"></script>
