@@ -1,17 +1,15 @@
 import { apiGet } from './api.js';
 import { openArticleCard, closeArticleCard } from './card.js';
 import { state, notify } from './state.js';
-// Both loaded as ES module imports (not classic <script> globals) with
-// their 'three' dependency externalized (?external=three) and resolved
-// via the importmap in index.html's <head> — that's what makes them
-// share one single Three.js instance instead of each bundling its own,
-// which previously threw "can't access property CanvasTexture, t is
-// undefined" (three-spritetext's UMD build expecting a global THREE that
-// 3d-force-graph never exposed) and, once that was fixed by importing
-// three-spritetext standalone, "THREE.WARNING: Multiple instances of
-// Three.js being imported" (two independent bundled copies).
-import ForceGraph3D from 'https://esm.sh/3d-force-graph?external=three';
-import SpriteText from 'https://esm.sh/three-spritetext?external=three';
+
+// ForceGraph3D and SpriteText are classic <script> globals (see
+// index.html), same pattern as cytoscape below. A standalone Three.js
+// UMD build is also loaded ahead of three-spritetext there purely so
+// three-spritetext has a global THREE to bind to — see the comment on
+// those script tags for why this still logs a harmless "multiple
+// instances of Three.js" warning (an ESM/import-map approach avoids
+// that warning but was more fragile — it broke each time 3d-force-graph
+// touched a new Three.js subpath internally).
 
 let cy; // Cytoscape instance — 2D relation graph
 let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)

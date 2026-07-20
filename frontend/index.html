@@ -15,29 +15,6 @@
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/map.css" />
-
-  <!--
-    3d-force-graph and three-spritetext (both imported as ES modules in
-    graph.js, with three externalized via esm.sh's ?external=three) each
-    depend on Three.js. Without this, esm.sh would bundle a separate copy
-    of Three.js into each, and having two independent Three.js instances
-    on the page triggers "THREE.WARNING: Multiple instances of Three.js
-    being imported" — this import map makes both resolve the bare
-    "three" specifier to the exact same module, so only one instance is
-    ever loaded. The "three/" prefix entry is also needed: 3d-force-graph
-    internally imports subpaths like
-    "three/examples/jsm/controls/DragControls.js", which the exact-match
-    "three" entry alone doesn't cover — without it those subpath imports
-    are bare specifiers with nothing to resolve them to.
-  -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://esm.sh/three@0.185.1",
-        "three/": "https://esm.sh/three@0.185.1/"
-      }
-    }
-  </script>
 </head>
 <body>
   <div id="app">
@@ -166,11 +143,18 @@
       </p>
       <p class="card-section-label">Privacy &amp; IP logging</p>
       <p>
-        Apollon does not use tracking cookies, analytics, or advertising trackers of
-        any kind, and does not build profiles of visitors. The only thing logged
-        about a visit is the IP address used to reach the service, and it is used
-        exclusively for automated bot protection (rate-limiting and firewall rules) &mdash;
-        never for tracking, analytics, or identifying individual visitors.
+        Apollon uses Cloudflare Web Analytics to measure real-user page-load
+        performance (Real User Measurements). It is a cookie-free, privacy-first
+        service &mdash; it does not set cookies, does not use localStorage, and does
+        not fingerprint visitors via IP address, user agent, or any other means; it
+        only aggregates anonymised performance metrics and is not used to track or
+        profile individuals. It is configured to exclude visitor data from the EU.
+      </p>
+      <p>
+        Apollon does not use advertising trackers or build profiles of visitors.
+        The only other thing logged about a visit is the IP address used to reach
+        the service, used exclusively for automated bot protection (rate-limiting
+        and firewall rules).
       </p>
     </div>
     <div class="dialog-actions">
@@ -182,13 +166,15 @@
     <div class="admin-section-title" style="margin-bottom:14px;">Before You Continue</div>
     <div class="legal-notice-body">
       <p>
-        Apollon does not use tracking cookies, analytics, or advertising trackers of
-        any kind.
+        Apollon uses Cloudflare Web Analytics (a cookie-free, privacy-first
+        service) to measure page-load performance &mdash; it does not set cookies
+        or fingerprint visitors, and EU visitor data is excluded. Apollon itself
+        does not use tracking cookies or advertising trackers of any kind.
       </p>
       <p>
-        The only thing logged about your visit is the IP address used to reach this
-        service &mdash; used exclusively for automated bot protection (rate-limiting
-        and firewall rules), never to track, profile, or identify visitors.
+        The only other thing logged about your visit is the IP address used to
+        reach this service &mdash; used exclusively for automated bot protection
+        (rate-limiting and firewall rules), never to track or profile visitors.
       </p>
     </div>
     <div class="dialog-actions">
@@ -200,6 +186,21 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
+  <!--
+    Three.js dropped its classic global/UMD build (build/three.min.js)
+    after r160 in favor of ES modules only — so this is pinned there
+    deliberately, not stale. Loaded standalone (as window.THREE) purely
+    so three-spritetext's own classic build below can find a global THREE
+    to bind to; 3d-force-graph bundles its own separate, independent copy
+    of Three.js internally regardless, which is why the console shows
+    "THREE.WARNING: Multiple instances of Three.js being imported" — a
+    known, harmless characteristic of combining these two libraries via
+    plain <script> tags rather than a bundler, and the accepted tradeoff
+    for not depending on import-map/ESM subpath resolution instead.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three-spritetext@1.9.3/dist/three-spritetext.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.0/dist/3d-force-graph.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script type="module" src="/js/app.js"></script>
