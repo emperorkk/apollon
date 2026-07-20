@@ -9,4 +9,4 @@ export const ADMIN_EMAIL = 'kkourentzes@gmail.com';
 // change, so the header shows which build is actually live — useful for
 // confirming a fix has rolled out rather than just guessing from a
 // hard-refresh.
-export const APP_VERSION = 'v1.3.1';
+export const APP_VERSION = 'v1.3.2';

@@ -293,8 +293,13 @@ function getGraph3D() {
     })
     .nodeThreeObjectExtend(true)
     .nodeThreeObject(makeNodeSprite)
-    .linkColor(() => 'rgba(220, 228, 235, 0.25)')
-    .linkWidth(0.6)
+    // Near-white at 25% opacity and 0.6px wide was nearly invisible
+    // against the near-black background — the app's own accent teal at
+    // higher opacity and width reads clearly without competing with the
+    // node colors (root keyword is the only other thing using this teal,
+    // and it's a filled sphere vs. a thin line, so there's no ambiguity).
+    .linkColor(() => 'rgba(79, 216, 232, 0.55)')
+    .linkWidth(1.1)
     .onNodeClick((node) => {
       if (node.type === 'article') {
         openArticleFromGraph(node.id);
