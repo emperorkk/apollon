@@ -5,9 +5,12 @@ import { escapeHtml } from './utils.js';
 
 const mainEl = () => document.getElementById('admin-main');
 
+// Also reached after api.js's auth-failure recovery clears a stale/expired
+// session and reloads this page — without a way back, that left users
+// stranded on a dead-end 404 with no path to sign back in.
 function render404() {
   document.body.innerHTML =
-    '<div class="admin-404"><h1>404</h1><p>Not found.</p></div>';
+    '<div class="admin-404"><h1>404</h1><p>Not found.</p><a class="legal-footer-link" href="/">&larr; Back to Apollon</a></div>';
 }
 
 async function loadStats() {
