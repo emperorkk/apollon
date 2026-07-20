@@ -1,15 +1,18 @@
 import { apiGet } from './api.js';
 import { openArticleCard, closeArticleCard } from './card.js';
 import { state, notify } from './state.js';
-
-// ForceGraph3D and SpriteText are classic <script> globals (see
-// index.html), same pattern as cytoscape below. A standalone Three.js
-// UMD build is also loaded ahead of three-spritetext there purely so
-// three-spritetext has a global THREE to bind to — see the comment on
-// those script tags for why this still logs a harmless "multiple
-// instances of Three.js" warning (an ESM/import-map approach avoids
-// that warning but was more fragile — it broke each time 3d-force-graph
-// touched a new Three.js subpath internally).
+// Both loaded as ES module imports, with their 'three' dependency
+// externalized (?external=three) and resolved via the importmap in
+// index.html's <head> — see the comment there for why a classic
+// <script>-tag setup doesn't actually work for this combination:
+// 3d-force-graph auto-detects and reuses a global `window.THREE` if one
+// exists, but the only Three.js version with a classic global build
+// (r160) is too old for 3d-force-graph@1.80.0's internals, which
+// crashes ("Ak.Timer is not a constructor") the moment it picks that
+// stale global up. The import map sidesteps that entirely by giving
+// both libraries the exact same modern, ESM-only Three.js build.
+import ForceGraph3D from 'https://esm.sh/3d-force-graph?external=three';
+import SpriteText from 'https://esm.sh/three-spritetext?external=three';
 
 let cy; // Cytoscape instance — 2D relation graph
 let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)

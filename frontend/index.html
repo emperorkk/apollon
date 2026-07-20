@@ -15,6 +15,37 @@
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/map.css" />
+
+  <!--
+    3d-force-graph and three-spritetext (both imported as ES modules in
+    graph.js, with three externalized via esm.sh's ?external=three) each
+    depend on Three.js. This import map makes both resolve the bare
+    "three" specifier (and any "three/<subpath>" import, e.g.
+    three/examples/jsm/controls/DragControls.js) to the exact same
+    pinned module, so exactly one Three.js instance is ever loaded.
+
+    This isn't just cosmetic: 3d-force-graph auto-detects and reuses a
+    global `window.THREE` if one is already present on the page rather
+    than using its own bundled copy. Three.js dropped its classic global/
+    UMD build after r160 (mid-2024) in favor of ES-modules-only, so a
+    classic <script>-tag setup can only ever provide that old r160 build
+    as the global — and 3d-force-graph@1.80.0's internals need a much
+    newer Three.js API than r160 has, so it detects and reuses that stale
+    global and crashes ("Ak.Timer is not a constructor"). There is no
+    Three.js version that is both a classic global build and new enough
+    for 3d-force-graph to work correctly, so the plain-<script>-tag
+    approach is not just noisier here — it's actually broken for this
+    combination. The import map is the real fix, not a fragile
+    alternative.
+  -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.185.1",
+        "three/": "https://esm.sh/three@0.185.1/"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="app">
@@ -186,21 +217,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
-  <!--
-    Three.js dropped its classic global/UMD build (build/three.min.js)
-    after r160 in favor of ES modules only — so this is pinned there
-    deliberately, not stale. Loaded standalone (as window.THREE) purely
-    so three-spritetext's own classic build below can find a global THREE
-    to bind to; 3d-force-graph bundles its own separate, independent copy
-    of Three.js internally regardless, which is why the console shows
-    "THREE.WARNING: Multiple instances of Three.js being imported" — a
-    known, harmless characteristic of combining these two libraries via
-    plain <script> tags rather than a bundler, and the accepted tradeoff
-    for not depending on import-map/ESM subpath resolution instead.
-  -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three-spritetext@1.9.3/dist/three-spritetext.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.0/dist/3d-force-graph.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script type="module" src="/js/app.js"></script>
