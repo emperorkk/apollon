@@ -220,8 +220,15 @@ async function renderRelationGraph(rootId) {
   });
 
   wireEdgeTooltips(cy);
+  // Every node here is a story — a single click/tap always opens it. There
+  // used to also be a dbltap handler that re-centered the graph on that
+  // node instead, but double-clicking to "open" something is a strong
+  // instinct; that shortcut meant a habitual double-click silently swapped
+  // in a re-centered graph instead of the article the user actually
+  // wanted. Re-centering is already available from the article card
+  // itself (its own "View Graph" button), so nothing is lost by dropping
+  // the ambiguous in-graph shortcut.
   cy.on('tap', 'node', (evt) => openArticleFromGraph(evt.target.id()));
-  cy.on('dbltap', 'node', (evt) => renderRelationGraph(evt.target.id()));
 }
 
 // ---------------------------------------------------------------------------
