@@ -24,10 +24,19 @@
     on the page triggers "THREE.WARNING: Multiple instances of Three.js
     being imported" — this import map makes both resolve the bare
     "three" specifier to the exact same module, so only one instance is
-    ever loaded.
+    ever loaded. The "three/" prefix entry is also needed: 3d-force-graph
+    internally imports subpaths like
+    "three/examples/jsm/controls/DragControls.js", which the exact-match
+    "three" entry alone doesn't cover — without it those subpath imports
+    are bare specifiers with nothing to resolve them to.
   -->
   <script type="importmap">
-    { "imports": { "three": "https://esm.sh/three@0.185.1" } }
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.185.1",
+        "three/": "https://esm.sh/three@0.185.1/"
+      }
+    }
   </script>
 </head>
 <body>
