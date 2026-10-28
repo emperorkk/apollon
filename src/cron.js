@@ -6,7 +6,7 @@ import { embedArticle } from './pipeline/embed.js';
 import { computeRelations } from './pipeline/relate.js';
 import { maybeNotify } from './pipeline/notify.js';
 import { checkAndAlert } from './pipeline/health.js';
-import { MAX_FINALIZE_PER_RUN, MAX_BATCH_SIZE } from './lib/constants.js';
+import { MAX_FINALIZE_PER_RUN, MAX_BATCH_SIZE, FINALIZE_TIME_BUDGET_MS } from './lib/constants.js';
 
 const RESULT_UPDATE_CHUNK = 100;
 
@@ -249,7 +249,23 @@ async function finalizeArticle(env, db, pending, gptResult, allTopics) {
   return { failedGeocodes };
 }
 
-async function finalizeReadyArticles(env, db) {
+async function finalizeReadyArticles(env, db, runId) {
+  // Two overlapping ticks would finalize the same rows twice and, worse,
+  // geocode concurrently — doubling the request rate Nominatim allows. A
+  // tick skips finalizing while an earlier one is still running (runs
+  // older than 10 minutes are treated as dead, e.g. killed mid-run).
+  const active = await db
+    .prepare(
+      "SELECT 1 FROM cron_runs WHERE status = 'running' AND id < ? AND started_at > datetime('now', '-10 minutes') LIMIT 1"
+    )
+    .bind(runId)
+    .first();
+  if (active) {
+    console.log('[cron] previous run still finalizing, skipping finalize this tick');
+    return { finalized: 0, failedGeocodes: 0 };
+  }
+
+  const startedAt = Date.now();
   const topics = await getActiveTopics(db);
   // Newest first: with more 'ready' articles than MAX_FINALIZE_PER_RUN can
   // drain in one tick, an unordered (effectively FIFO-by-rowid) select left
@@ -267,6 +283,9 @@ async function finalizeReadyArticles(env, db) {
   let failedGeocodes = 0;
 
   for (const pending of ready) {
+    // Stop well inside the 5-minute cron interval; the rest wait for the
+    // next tick.
+    if (Date.now() - startedAt > FINALIZE_TIME_BUDGET_MS) break;
     try {
       const gptResult = JSON.parse(pending.gpt_result);
       const result = await finalizeArticle(env, db, pending, gptResult, topics);
@@ -305,7 +324,7 @@ export async function runCron(env) {
     const ingested = await ingestNewArticles(db);
     const submitted = await submitQueuedBatch(env, db);
     await syncBatchStatuses(env, db);
-    const { finalized, failedGeocodes } = await finalizeReadyArticles(env, db);
+    const { finalized, failedGeocodes } = await finalizeReadyArticles(env, db, runId);
 
     await db
       .prepare(

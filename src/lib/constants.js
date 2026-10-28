@@ -18,9 +18,13 @@ export const BATCH_COMPLETION_WINDOW = '24h';
 // before it reaches the final "mark as success" update (leaving cron_runs
 // stuck at 'running'). Kept small so a tick reliably finishes; leftovers
 // just finish on later ticks, which is fine since ingestion isn't
-// time-critical. 15 on Workers Paid (scheduled runs may take up to 15
-// minutes, and D1 allows 1000 queries per invocation); it was 5 on Free.
-export const MAX_FINALIZE_PER_RUN = 15;
+// time-critical. 50 on Workers Paid (D1 allows 1000 queries per
+// invocation); it was 5 on Free. Geocoding makes this wall-clock bound, so
+// a tick also stops after FINALIZE_TIME_BUDGET_MS to finish inside the
+// 5-minute cron interval, and skips finalizing while a previous tick is
+// still running (see cron.js).
+export const MAX_FINALIZE_PER_RUN = 50;
+export const FINALIZE_TIME_BUDGET_MS = 4 * 60 * 1000;
 // Daily retention job (pipeline/retention.js): everything older than this
 // is deleted — articles plus their relations/topics/locations/entities,
 // stale pending articles, and old cron/batch bookkeeping rows.

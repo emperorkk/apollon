@@ -1,16 +1,51 @@
-import { ADMIN_EMAIL } from './config.js';
-import { state } from './state.js';
+import { ADMIN_EMAIL, GOOGLE_CLIENT_ID } from './config.js';
+import { state, setSession } from './state.js';
 import { apiGet, apiPost, apiPut, apiDelete } from './api.js';
 import { escapeHtml, formatAthens, athensYesterday } from './utils.js';
 
 const mainEl = () => document.getElementById('admin-main');
 
-// Also reached after api.js's auth-failure recovery clears a stale/expired
-// session and reloads this page — without a way back, that left users
-// stranded on a dead-end 404 with no path to sign back in.
-function render404() {
-  document.body.innerHTML =
-    '<div class="admin-404"><h1>404</h1><p>Not found.</p><a class="legal-footer-link" href="/">&larr; Back to Apollon</a></div>';
+// Shown when there's no admin session — first visit, an expired token, or
+// after api.js's auth-failure recovery clears a stale session and reloads.
+// It used to be a dead-end "404 Not found" with no way to sign in from
+// here, which read as the admin page being broken.
+function renderSignIn(message) {
+  document.body.innerHTML = `<div class="admin-404">
+    <h1>ADMIN CONSOLE</h1>
+    <p>${escapeHtml(message)}</p>
+    <div id="admin-gsi"></div>
+    <a class="legal-footer-link" href="/">&larr; Back to Apollon</a>
+  </div>`;
+
+  // The GSI script loads async; wait for it (up to ~10s).
+  let tries = 0;
+  const timer = setInterval(() => {
+    if (!window.google?.accounts?.id && ++tries < 100) return;
+    clearInterval(timer);
+    if (!window.google?.accounts?.id) return;
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleAdminCredential });
+    google.accounts.id.renderButton(document.getElementById('admin-gsi'), {
+      theme: 'filled_black',
+      size: 'large',
+      text: 'signin_with',
+    });
+  }, 100);
+}
+
+function decodeJwtPayload(token) {
+  const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), '=')));
+}
+
+async function handleAdminCredential(response) {
+  try {
+    const { token } = await apiPost('/auth/google', { id_token: response.credential });
+    setSession(token, { email: decodeJwtPayload(token).email });
+    window.location.reload();
+  } catch (err) {
+    console.error('Admin sign-in failed', err);
+    renderSignIn('Sign-in failed — please try again.');
+  }
 }
 
 async function loadStats() {
@@ -513,8 +548,12 @@ function wireDialogs() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (state.user?.email !== ADMIN_EMAIL || !state.token) {
-    render404();
+  if (!state.token || !state.user) {
+    renderSignIn('Sign in with the admin Google account to continue.');
+    return;
+  }
+  if (state.user.email !== ADMIN_EMAIL) {
+    renderSignIn(`${state.user.email} doesn't have admin access. Sign in with the admin account.`);
     return;
   }
 
