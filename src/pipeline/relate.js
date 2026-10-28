@@ -1,4 +1,4 @@
-import { SIMILARITY_THRESHOLD, RELATION_WINDOW_DAYS } from '../lib/constants.js';
+import { SIMILARITY_THRESHOLD, RELATION_WINDOW_DAYS, MAX_RELATIONS_PER_ARTICLE } from '../lib/constants.js';
 import { queryChunkedByIds } from '../lib/db.js';
 
 // Shared named people/orgs are a strong "same story" signal on their own —
@@ -68,7 +68,30 @@ export async function computeRelations(env, article, embedding, topicIds, entiti
 
   if (!candidates.size) return;
 
-  const otherIds = [...candidates.keys()];
+  // Cap at MAX_RELATIONS_PER_ARTICLE on both sides: keep only the
+  // best-scoring candidates that still exist (Vectorize can return ids of
+  // already-deleted articles) and haven't hit the cap themselves. Only the
+  // top few multiples of the cap are checked, so a very common entity
+  // can't turn this into thousands of lookups.
+  const ranked = [...candidates.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_RELATIONS_PER_ARTICLE * 3)
+    .map(([id]) => id);
+  const countRows = await queryChunkedByIds(
+    db,
+    ranked,
+    (placeholders) =>
+      `SELECT id,
+         (SELECT COUNT(*) FROM article_relations WHERE article_a = articles.id) +
+         (SELECT COUNT(*) FROM article_relations WHERE article_b = articles.id) AS n
+       FROM articles WHERE id IN (${placeholders})`
+  );
+  const relationCount = new Map(countRows.map((r) => [r.id, r.n]));
+  const otherIds = ranked
+    .filter((id) => relationCount.has(id) && relationCount.get(id) < MAX_RELATIONS_PER_ARTICLE)
+    .slice(0, MAX_RELATIONS_PER_ARTICLE);
+  if (!otherIds.length) return;
+
   const topicRows = await queryChunkedByIds(
     db,
     otherIds,
@@ -86,7 +109,8 @@ export async function computeRelations(env, article, embedding, topicIds, entiti
       'ON CONFLICT(article_a, article_b) DO UPDATE SET similarity = MAX(similarity, excluded.similarity), shared_tags = excluded.shared_tags'
   );
 
-  const batch = [...candidates.entries()].map(([otherId, score]) => {
+  const batch = otherIds.map((otherId) => {
+    const score = candidates.get(otherId);
     const [articleA, articleB] = [article.id, otherId].sort();
     const otherTopics = topicsByArticle.get(otherId) ?? [];
     const sharedTags = (topicIds ?? []).filter((t) => otherTopics.includes(t));

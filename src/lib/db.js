@@ -39,7 +39,8 @@ export function chunkArray(arr, size) {
 // are bound before the id list on every chunk.
 export async function queryChunkedByIds(db, ids, buildSql, extraBinds = []) {
   if (!ids.length) return [];
-  const chunks = chunkArray(ids, D1_MAX_BOUND_PARAMS);
+  // extraBinds count toward D1's per-query parameter cap too.
+  const chunks = chunkArray(ids, D1_MAX_BOUND_PARAMS - extraBinds.length);
   const statements = chunks.map((chunk) => {
     const placeholders = chunk.map(() => '?').join(',');
     return db.prepare(buildSql(placeholders)).bind(...extraBinds, ...chunk);

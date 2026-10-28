@@ -17,6 +17,8 @@ import adminCron from './api/admin/cron.js';
 import adminArticles from './api/admin/articles.js';
 import adminPending from './api/admin/pending.js';
 import { runCron } from './cron.js';
+import { runRetention } from './pipeline/retention.js';
+import { RETENTION_CRON } from './lib/constants.js';
 
 const app = new Hono();
 
@@ -50,6 +52,10 @@ app.notFound((c) => {
 export default {
   fetch: app.fetch,
   async scheduled(event, env, ctx) {
+    if (event.cron === RETENTION_CRON) {
+      ctx.waitUntil(runRetention(env));
+      return;
+    }
     ctx.waitUntil(runCron(env));
   },
 };

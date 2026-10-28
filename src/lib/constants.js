@@ -20,3 +20,17 @@ export const BATCH_COMPLETION_WINDOW = '24h';
 // just finish on later ticks, which is fine since ingestion isn't
 // time-critical.
 export const MAX_FINALIZE_PER_RUN = 5;
+// Daily retention job (pipeline/retention.js): everything older than this
+// is deleted — articles plus their relations/topics/locations/entities,
+// stale pending articles, and old cron/batch bookkeeping rows.
+export const RETENTION_DAYS = 30;
+export const RETENTION_DELETE_CHUNK = 500;
+export const VECTORIZE_DELETE_CHUNK = 500;
+export const RETENTION_CRON = '17 3 * * *';
+// Hard cap on relations per article, counting both sides of the pair —
+// uncapped shared-entity matching ("United States", etc.) linked each new
+// article to thousands of old ones and is what filled D1 up.
+export const MAX_RELATIONS_PER_ARTICLE = 20;
+// Max queued articles per OpenAI batch submission; the rest go in the next
+// batch once this one finishes.
+export const MAX_BATCH_SIZE = 500;

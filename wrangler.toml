@@ -8,7 +8,9 @@ enabled = true
 invocation_logs = true
 
 [triggers]
-crons = ["*/5 * * * *"]
+# The second entry is the daily retention job — must match RETENTION_CRON
+# in src/lib/constants.js (src/worker.js dispatches on it).
+crons = ["*/5 * * * *", "17 3 * * *"]
 
 # Serves frontend/ directly from this Worker (no separate Pages project).
 # Requests matching a real file in frontend/ are served directly; anything
