@@ -1,6 +1,6 @@
 import { apiGet, apiDelete } from './api.js';
 import { openGraph } from './graph.js';
-import { escapeHtml, importanceBarHtml } from './utils.js';
+import { escapeHtml, importanceBarHtml, formatAthens } from './utils.js';
 import { state, notify } from './state.js';
 import { ADMIN_EMAIL } from './config.js';
 
@@ -39,7 +39,7 @@ export function closeArticleCard() {
 function render(article) {
   const hasEn = !!article.summary_en;
   const hasGr = !!article.synopsis_gr;
-  const date = new Date(article.pub_date).toLocaleString();
+  const date = `${formatAthens(article.pub_date)} (Athens)`;
 
   const enContent = hasEn
     ? `<p class="card-text">${escapeHtml(article.summary_en)}</p>`

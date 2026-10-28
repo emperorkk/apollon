@@ -95,6 +95,21 @@ a {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* dvh tracks mobile browsers' collapsing URL bar; 100vh alone leaves the
+     bottom of the app hidden behind it. */
+  height: 100dvh;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .app-main {
@@ -572,7 +587,9 @@ a {
   align-items: center;
 }
 
-.importance-bar span {
+/* :not() — the "N/10" label is a span inside the bar too, and was being
+   squashed into a 4px-wide tick, spilling its text over the bars. */
+.importance-bar span:not(.importance-label) {
   width: 4px;
   height: 10px;
   background: var(--border-strong);
@@ -1198,4 +1215,270 @@ dialog::backdrop {
 
 .hidden {
   display: none !important;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Latest daily report banner (above the feed)                            */
+/* ---------------------------------------------------------------------- */
+
+.latest-report {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.latest-report[hidden] {
+  display: none;
+}
+
+.latest-report:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-soft);
+}
+
+.latest-report-label {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.latest-report-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.latest-report-arrow {
+  color: var(--accent);
+}
+
+.report-generate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.report-generate-status,
+.admin-empty {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Tablet & mobile                                                         */
+/* ---------------------------------------------------------------------- */
+
+/* Below the desktop breakpoint the keyword sidebar used to disappear
+   entirely; it now becomes a one-line, horizontally scrolling strip above
+   the map instead. */
+@media (max-width: 1100px) {
+  .app-main {
+    flex-direction: column;
+  }
+  .keyword-panel {
+    display: flex;
+    order: -1;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    border-left: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .keyword-panel-header {
+    display: none;
+  }
+  .keyword-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: center;
+    padding: 8px 12px;
+    scrollbar-width: none;
+  }
+  .keyword-list::-webkit-scrollbar {
+    display: none;
+  }
+  .keyword-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .keyword-list .card-placeholder {
+    margin: 0;
+    font-size: 11px;
+    padding: 4px 0;
+  }
+}
+
+/* Phones: the whole page scrolls as one document (map on top, feed below)
+   instead of a fixed-height app with an internally scrolling feed — a
+   ~250px feed pane under a tall header and map was barely usable. The
+   header wraps into brand/actions, full-width search, then a swipeable
+   topic row. feed.js switches its infinite-scroll observer to the
+   viewport at the same breakpoint. */
+@media (max-width: 720px) {
+  #app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px 10px;
+    padding: 8px 12px 10px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .brand {
+    order: 1;
+  }
+  .header-actions {
+    order: 2;
+    margin-left: auto;
+    gap: 6px;
+  }
+  .search-wrap {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .topic-filters {
+    order: 4;
+    flex: 1 1 100%;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  /* 16px+ stops iOS Safari zooming the page when a field is focused. */
+  #search-input,
+  .region-select {
+    font-size: 16px;
+  }
+  #search-input {
+    padding: 10px 12px;
+  }
+
+  .btn-ghost {
+    min-height: 36px;
+    padding: 8px 10px;
+  }
+  .topic-pill {
+    padding: 8px 12px;
+  }
+
+  .app-main {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+  .main-content {
+    flex: 0 0 auto;
+  }
+  .map-panel {
+    flex: 0 0 auto;
+    height: 52vh;
+    height: 52svh;
+    min-height: 280px;
+  }
+  .map-legend {
+    display: none;
+  }
+  .map-controls {
+    left: 8px;
+    right: auto;
+    bottom: 8px;
+    padding: 6px 10px;
+  }
+  .days-control input[type='range'] {
+    width: 120px;
+  }
+
+  .feed-panel {
+    flex: 0 0 auto;
+  }
+  .feed-toolbar {
+    padding: 8px 12px;
+  }
+  .latest-report {
+    margin: 10px 12px 0;
+  }
+  .feed-list {
+    overflow: visible;
+    padding: 10px 12px calc(56px + env(safe-area-inset-bottom));
+  }
+
+  .legal-footer {
+    padding-bottom: calc(5px + env(safe-area-inset-bottom));
+  }
+
+  .admin-main .data-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+.health-banner {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #3ecf8e;
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.health-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  color: #3ecf8e;
+}
+
+.health-banner ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.health-banner.health-degraded {
+  border-left-color: #f2c14e;
+}
+.health-banner.health-degraded strong {
+  color: #f2c14e;
+}
+.health-banner.health-down {
+  border-left-color: var(--danger);
+}
+.health-banner.health-down strong {
+  color: var(--danger);
+}
+
+.offline-banner {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #04070a;
+  background: #f2c14e;
+}
+
+.offline-banner[hidden] {
+  display: none;
 }

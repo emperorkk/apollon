@@ -2,12 +2,65 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Apollon — World Intelligence Dashboard</title>
-  <meta name="description" content="Real-time global news aggregation and geopolitical intelligence dashboard." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Apollon — Live World News Map &amp; Geopolitical Intelligence</title>
+  <meta name="description" content="Live world news on an interactive map: conflicts, diplomacy, energy, natural disasters and logistics, summarised by AI from hundreds of global sources, plus a daily world news report." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://apollon.talosat.work/" />
+  <meta name="theme-color" content="#04070a" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="manifest" href="/site.webmanifest" />
+  <link rel="alternate" type="application/rss+xml" title="Apollon Daily Reports" href="/reports/rss.xml" />
+
+  <!-- Open Graph / social previews. Absolute URLs: crawlers don't resolve relative ones. -->
+  <meta property="og:site_name" content="Apollon" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Apollon — Live World News Map &amp; Geopolitical Intelligence" />
+  <meta property="og:description" content="Live world news on an interactive map, summarised by AI from hundreds of global sources, plus a daily world news report." />
+  <meta property="og:url" content="https://apollon.talosat.work/" />
+  <meta property="og:image" content="https://apollon.talosat.work/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Apollon — World news, mapped in real time" />
+  <meta property="og:locale" content="en_GB" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Apollon — Live World News Map &amp; Geopolitical Intelligence" />
+  <meta name="twitter:description" content="Live world news on an interactive map, summarised by AI from hundreds of global sources, plus a daily world news report." />
+  <meta name="twitter:image" content="https://apollon.talosat.work/og-image.png" />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://apollon.talosat.work/#website",
+          "name": "Apollon",
+          "alternateName": "Apollon World Intelligence Dashboard",
+          "url": "https://apollon.talosat.work/",
+          "description": "Live world news map and geopolitical intelligence dashboard with a daily AI-written world news report.",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://apollon.talosat.work/#org" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://apollon.talosat.work/#org",
+          "name": "Apollon",
+          "url": "https://apollon.talosat.work/",
+          "logo": { "@type": "ImageObject", "url": "https://apollon.talosat.work/icons/icon-512.png", "width": 512, "height": 512 }
+        },
+        {
+          "@type": "WebApplication",
+          "name": "Apollon World Intelligence Dashboard",
+          "url": "https://apollon.talosat.work/",
+          "applicationCategory": "NewsApplication",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+        }
+      ]
+    }
+  </script>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
@@ -48,7 +101,13 @@
   </script>
 </head>
 <body>
+  <noscript>
+    <p>Apollon is a live world news map and needs JavaScript. You can still read the
+    <a href="/reports">daily world news reports</a> without it.</p>
+  </noscript>
   <div id="app">
+    <div class="offline-banner" id="offline-banner" role="status" hidden>OFFLINE &middot; showing saved data</div>
+    <h1 class="visually-hidden">Apollon — live world news map and geopolitical intelligence</h1>
     <header class="app-header">
       <div class="brand">
         <span class="brand-mark">&#9670;</span>
@@ -64,6 +123,7 @@
       </div>
 
       <div class="header-actions">
+        <a href="/reports" class="btn-ghost header-reports">REPORTS</a>
         <button id="push-toggle" class="btn-ghost" type="button" hidden>NOTIFY</button>
         <div id="auth-area" class="auth-area"></div>
         <a href="/admin.html" id="admin-link" class="btn-ghost" hidden>ADMIN</a>
@@ -92,6 +152,11 @@
               <option value="">ALL REGIONS</option>
             </select>
           </div>
+          <a class="latest-report" id="latest-report" href="/reports" hidden>
+            <span class="latest-report-label">DAILY REPORT</span>
+            <span class="latest-report-title" id="latest-report-title"></span>
+            <span class="latest-report-arrow" aria-hidden="true">&rarr;</span>
+          </a>
           <div class="feed-list" id="feed-list"></div>
           <div class="feed-sentinel" id="feed-sentinel"></div>
         </section>

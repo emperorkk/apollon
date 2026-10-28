@@ -1,11 +1,14 @@
-import { getActiveSources, getActiveTopics, deleteArticleCascade } from './lib/db.js';
+import { getActiveSources, getActiveTopics, deleteArticleCascade, queryChunkedByIds, chunkArray } from './lib/db.js';
 import { fetchNewArticles } from './pipeline/ingest.js';
 import { submitBatch, getBatchStatus, downloadBatchResults } from './pipeline/batch.js';
 import { geocodeArticle } from './pipeline/geocode.js';
 import { embedArticle } from './pipeline/embed.js';
 import { computeRelations } from './pipeline/relate.js';
 import { maybeNotify } from './pipeline/notify.js';
-import { MAX_FINALIZE_PER_RUN } from './lib/constants.js';
+import { checkAndAlert } from './pipeline/health.js';
+import { MAX_FINALIZE_PER_RUN, MAX_BATCH_SIZE } from './lib/constants.js';
+
+const RESULT_UPDATE_CHUNK = 100;
 
 // --- ingest: RSS -> pending_articles (status='queued') ----------------------
 // INSERT OR IGNORE on the deterministic sha256(guid) id naturally dedupes
@@ -52,7 +55,13 @@ async function submitQueuedBatch(env, db) {
     .first();
   if (openBatch) return null;
 
-  const { results: queued } = await db.prepare("SELECT * FROM pending_articles WHERE status = 'queued'").all();
+  // Capped and newest-first: an uncapped select let a backlog grow into
+  // one huge batch, and the per-id UPDATE below blew D1's bound-parameter
+  // limit (~100) for anything over that.
+  const { results: queued } = await db
+    .prepare("SELECT * FROM pending_articles WHERE status = 'queued' ORDER BY pub_date DESC LIMIT ?")
+    .bind(MAX_BATCH_SIZE)
+    .all();
   if (!queued.length) return null;
 
   const topics = await getActiveTopics(db);
@@ -60,17 +69,30 @@ async function submitQueuedBatch(env, db) {
 
   await db.prepare('INSERT INTO batch_jobs (id, status) VALUES (?, ?)').bind(batchId, status).run();
 
-  const ids = queued.map((a) => a.id);
-  const placeholders = ids.map(() => '?').join(',');
-  await db
-    .prepare(`UPDATE pending_articles SET batch_id = ?, status = 'batched' WHERE id IN (${placeholders})`)
-    .bind(batchId, ...ids)
-    .run();
+  await queryChunkedByIds(
+    db,
+    queued.map((a) => a.id),
+    (placeholders) => `UPDATE pending_articles SET batch_id = ?, status = 'batched' WHERE id IN (${placeholders})`,
+    [batchId]
+  );
 
   return { batchId, count: queued.length };
 }
 
 // --- batch sync: poll open batch jobs, pull results down once completed ----
+
+async function failBatch(db, batchId, status, errorMessage) {
+  await db.batch([
+    db
+      .prepare("UPDATE batch_jobs SET status = ?, completed_at = datetime('now'), error_message = ? WHERE id = ?")
+      .bind(status, errorMessage, batchId),
+    db
+      .prepare(
+        "UPDATE pending_articles SET status = 'failed', error_message = 'Batch job did not complete' WHERE batch_id = ? AND status = 'batched'"
+      )
+      .bind(batchId),
+  ]);
+}
 
 async function syncBatchStatuses(env, db) {
   const { results: openBatches } = await db
@@ -87,37 +109,34 @@ async function syncBatchStatuses(env, db) {
     }
 
     if (remote.status === 'completed') {
-      const resultsMap = await downloadBatchResults(env, remote);
-      for (const [customId, { result, error }] of resultsMap) {
-        if (error) {
-          await db
-            .prepare("UPDATE pending_articles SET status = 'failed', error_message = ? WHERE id = ?")
-            .bind(JSON.stringify(error), customId)
-            .run();
-        } else {
-          await db
-            .prepare("UPDATE pending_articles SET status = 'ready', gpt_result = ? WHERE id = ?")
-            .bind(JSON.stringify(result), customId)
-            .run();
-        }
+      let resultsMap;
+      try {
+        resultsMap = await downloadBatchResults(env, remote);
+      } catch (err) {
+        // OpenAI deletes batch output files after a while; once they're
+        // gone this throws on every tick forever, and since only one batch
+        // may be open at a time the whole pipeline stalls behind it (it
+        // sat like that from Sept 10). Give up on it and move on.
+        console.error(`[cron] abandoning batch ${job.id}: ${err.message}`);
+        await failBatch(db, job.id, 'failed', err.message);
+        continue;
+      }
+      // Batched rather than one query per article: Cloudflare caps D1
+      // calls per invocation, and a batch can hold MAX_BATCH_SIZE results.
+      const failStmt = db.prepare("UPDATE pending_articles SET status = 'failed', error_message = ? WHERE id = ?");
+      const readyStmt = db.prepare("UPDATE pending_articles SET status = 'ready', gpt_result = ? WHERE id = ?");
+      const updates = [...resultsMap].map(([customId, { result, error }]) =>
+        error ? failStmt.bind(JSON.stringify(error), customId) : readyStmt.bind(JSON.stringify(result), customId)
+      );
+      for (const chunk of chunkArray(updates, RESULT_UPDATE_CHUNK)) {
+        await db.batch(chunk);
       }
       await db
         .prepare("UPDATE batch_jobs SET status = 'completed', completed_at = datetime('now') WHERE id = ?")
         .bind(job.id)
         .run();
     } else if (['failed', 'expired', 'cancelled'].includes(remote.status)) {
-      await db
-        .prepare(
-          "UPDATE batch_jobs SET status = ?, completed_at = datetime('now'), error_message = ? WHERE id = ?"
-        )
-        .bind(remote.status, JSON.stringify(remote.errors ?? null), job.id)
-        .run();
-      await db
-        .prepare(
-          "UPDATE pending_articles SET status = 'failed', error_message = 'Batch job did not complete' WHERE batch_id = ? AND status = 'batched'"
-        )
-        .bind(job.id)
-        .run();
+      await failBatch(db, job.id, remote.status, JSON.stringify(remote.errors ?? null));
     } else if (remote.status !== job.status) {
       await db.prepare('UPDATE batch_jobs SET status = ? WHERE id = ?').bind(remote.status, job.id).run();
     }
@@ -276,6 +295,8 @@ async function finalizeReadyArticles(env, db) {
 // (spec §7.7).
 export async function runCron(env) {
   const db = env.DB;
+
+  await checkAndAlert(env);
 
   const { meta } = await db.prepare("INSERT INTO cron_runs (status) VALUES ('running')").run();
   const runId = meta.last_row_id;

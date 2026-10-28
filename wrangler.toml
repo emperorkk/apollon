@@ -3,8 +3,28 @@ main = "src/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Workers Caching: repeat GETs are answered from Cloudflare's cache without
+# running the Worker (no CPU, no D1 reads). What gets cached and for how
+# long is decided per path by src/lib/cache-policy.js via Cache-Control.
+[cache]
+enabled = true
+
+# Fonts and the logo are bundled into the Worker for the per-report Open
+# Graph images (src/og/report-image.js).
+[[rules]]
+type = "Data"
+globs = ["**/*.woff", "**/*.png"]
+fallthrough = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 [triggers]
-crons = ["*/5 * * * *"]
+# Entries after the first are the daily retention job and the daily
+# report — they must match RETENTION_CRON / DAILY_REPORT_CRON in
+# src/lib/constants.js (src/worker.js dispatches on them).
+crons = ["*/5 * * * *", "17 3 * * *", "23 4 * * *"]
 
 # Serves frontend/ directly from this Worker (no separate Pages project).
 # Requests matching a real file in frontend/ are served directly; anything
@@ -27,6 +47,8 @@ index_name = "wid-articles"
 [vars]
 ENVIRONMENT = "production"
 ADMIN_EMAIL = "kkourentzes@gmail.com"
+# Canonical origin for SEO URLs (canonical links, sitemap, Open Graph).
+SITE_URL = "https://apollon.talosat.work"
 
 # Secrets — set via: wrangler secret put SECRET_NAME
 # OPENAI_API_KEY

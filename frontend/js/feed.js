@@ -1,7 +1,7 @@
 import { state, subscribe, notify } from './state.js';
 import { apiGet } from './api.js';
 import { openArticleCard } from './card.js';
-import { escapeHtml, importanceBarHtml } from './utils.js';
+import { escapeHtml, importanceBarHtml, formatAthens } from './utils.js';
 
 let container;
 let sentinel;
@@ -33,11 +33,15 @@ export function initFeed(containerId) {
   resetAndLoad();
   subscribe(() => resetAndLoad());
 
+  // On phones the feed doesn't scroll internally — the whole page does
+  // (see the max-width: 720px block in main.css) — so observe against the
+  // viewport there instead.
+  const pageScrolls = window.matchMedia('(max-width: 720px)').matches;
   const observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting) loadMore();
     },
-    { root: container, rootMargin: '200px' }
+    { root: pageScrolls ? null : container, rootMargin: '200px' }
   );
   observer.observe(sentinel);
 }
@@ -93,12 +97,7 @@ function renderCard(article) {
   if (primaryColor) el.style.setProperty('--card-color', primaryColor);
 
   const summary = article.summary_en || article.synopsis_gr || '';
-  const date = new Date(article.pub_date).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = formatAthens(article.pub_date, { year: undefined });
 
   const topicTags = (article.topics ?? [])
     .map((t) => `<span class="topic-tag" style="--tag-color:${t.color_hex}">${escapeHtml(t.name)}</span>`)

@@ -21,31 +21,28 @@ async function sendViaFetch(sub, payload) {
   }
 }
 
-// Fan out a Web Push notification to every subscriber when a level-5 topic
-// trigger fires (spec §5.6). Failures for individual (likely stale)
-// subscriptions are logged and skipped rather than aborting the batch.
-export async function notifySubscribers(env, article, topic) {
-  webpush.setVapidDetails(
-    'mailto:contact@yourdomain.com',
-    env.VAPID_PUBLIC_KEY,
-    env.VAPID_PRIVATE_KEY
-  );
+// Each push is one fetch() subrequest. Workers Paid allows far more per
+// invocation than this, but a cap keeps one notification burst bounded.
+const MAX_PUSHES_PER_INVOCATION = 500;
 
-  const { results: subscriptions } = await env.DB.prepare(
-    'SELECT * FROM push_subscriptions'
-  ).all();
+// Sends one Web Push payload to the given subscriptions. Failures for
+// individual (likely stale) subscriptions are logged and skipped rather
+// than aborting the batch; gone ones (404/410) are deleted.
+async function sendToSubscriptions(env, subscriptions, message) {
+  if (!subscriptions.length) return 0;
+  if (subscriptions.length > MAX_PUSHES_PER_INVOCATION) {
+    console.warn(`[notify] ${subscriptions.length} subscriptions, only sending to the newest ${MAX_PUSHES_PER_INVOCATION}`);
+  }
 
-  const payload = JSON.stringify({
-    title: `[${topic.name}] ${article.title_en}`,
-    body: (article.title_en ?? '').slice(0, 100),
-    icon: '/icons/icon-192.png',
-    url: `/article/${article.id}`,
-  });
+  webpush.setVapidDetails('mailto:contact@yourdomain.com', env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
+  const payload = JSON.stringify({ icon: '/icons/icon-192.png', ...message });
 
+  let sent = 0;
   await Promise.all(
-    subscriptions.map(async (sub) => {
+    subscriptions.slice(0, MAX_PUSHES_PER_INVOCATION).map(async (sub) => {
       try {
         await sendViaFetch(sub, payload);
+        sent += 1;
       } catch (err) {
         console.error(`[notify] push failed for ${sub.endpoint}: ${err.message}`);
         if (err.statusCode === 404 || err.statusCode === 410) {
@@ -54,6 +51,29 @@ export async function notifySubscribers(env, article, topic) {
       }
     })
   );
+  return sent;
+}
+
+export async function notifyAll(env, message) {
+  const { results } = await env.DB.prepare('SELECT * FROM push_subscriptions ORDER BY id DESC').all();
+  return sendToSubscriptions(env, results, message);
+}
+
+export async function notifyAdmin(env, message) {
+  const { results } = await env.DB.prepare('SELECT * FROM push_subscriptions WHERE email = ? ORDER BY id DESC')
+    .bind(env.ADMIN_EMAIL)
+    .all();
+  return sendToSubscriptions(env, results, message);
+}
+
+// Fan out a Web Push notification to every subscriber when a level-5 topic
+// trigger fires (spec §5.6).
+export async function notifySubscribers(env, article, topic) {
+  await notifyAll(env, {
+    title: `[${topic.name}] ${article.title_en}`,
+    body: (article.title_en ?? '').slice(0, 100),
+    url: `/article/${article.id}`,
+  });
 }
 
 export async function maybeNotify(env, article, matchedTopics) {

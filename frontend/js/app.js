@@ -116,6 +116,21 @@ function wirePrivacyNotice() {
   }
 }
 
+// Surfaces the newest daily report above the feed (and gives crawlers that
+// do run JS a link into the report archive from the home page).
+async function renderLatestReport() {
+  try {
+    const { reports } = await apiGet('/reports?limit=1');
+    if (!reports.length) return;
+    const link = document.getElementById('latest-report');
+    link.href = reports[0].url;
+    document.getElementById('latest-report-title').textContent = reports[0].title;
+    link.hidden = false;
+  } catch (err) {
+    console.error('Failed to load latest report', err);
+  }
+}
+
 function renderVersion() {
   document.getElementById('brand-version').textContent = APP_VERSION;
 }
@@ -134,7 +149,25 @@ function wireOverlayDismiss() {
   });
 }
 
+// Offline support (see sw.js): the service worker caches the app shell,
+// recent API responses and viewed map tiles; the banner tells the viewer
+// when they're looking at saved data.
+function initOffline() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.error('Service worker registration failed', err));
+  }
+  const banner = document.getElementById('offline-banner');
+  const update = () => {
+    banner.hidden = navigator.onLine;
+  };
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
+}
+
 async function bootstrap() {
+  initOffline();
+
   try {
     const { topics } = await apiGet('/topics');
     state.topics = topics;
@@ -158,6 +191,7 @@ async function bootstrap() {
   initAuth();
   initPush();
   initKeywords('keyword-list');
+  renderLatestReport();
 
   subscribe(() => {});
 }
