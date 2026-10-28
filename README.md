@@ -84,6 +84,22 @@ Authorized JavaScript origins. The client ID is not secret — put it in
 - Sign in with `kkourentzes@gmail.com` and confirm the **ADMIN** link appears
   in the header, linking to `/admin.html`.
 
+## Scheduled jobs & public pages
+
+Three cron triggers (`wrangler.toml`), dispatched in `src/worker.js`:
+
+| Schedule (UTC) | Job | What it does |
+| --- | --- | --- |
+| every 5 min | `src/cron.js` | RSS ingest → OpenAI batch → finalize articles |
+| 03:17 daily | `src/pipeline/retention.js` | Deletes everything older than 30 days (articles + relations/topics/locations/entities, stale queue rows, old logs, Vectorize vectors) |
+| 04:23 daily | `src/pipeline/daily-report.js` | Writes one AI briefing for the previous UTC day into `daily_reports` (kept forever) |
+
+Server-rendered, indexable pages (`src/web/`): `/reports` (archive),
+`/reports/:date/:slug` (one report, with share buttons, Open Graph and
+NewsArticle JSON-LD), `/reports/latest`, `/reports/rss.xml`, `/sitemap.xml`,
+`/robots.txt`. A report can also be generated or regenerated on demand from
+the admin console (Daily Reports section).
+
 ## Local development
 
 ```bash

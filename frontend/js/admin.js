@@ -136,6 +136,97 @@ async function loadSources() {
     </table>`;
 }
 
+async function loadReports() {
+  const { reports } = await apiGet('/reports', { limit: 10 });
+  const rows = reports
+    .map(
+      (r) => `
+    <tr>
+      <td>${escapeHtml(r.report_date)}</td>
+      <td><a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></td>
+      <td>${r.article_count}</td>
+      <td>
+        <button type="button" class="btn-ghost" data-regen-report="${escapeHtml(r.report_date)}">Regenerate</button>
+        <button type="button" class="btn-ghost" data-delete-report="${escapeHtml(r.report_date)}">Delete</button>
+      </td>
+    </tr>`
+    )
+    .join('');
+
+  return `
+    <div class="report-generate">
+      <label class="form-field" style="margin:0;"><span>Day (UTC)</span><input type="date" id="report-date" /></label>
+      <button type="button" class="btn-primary" id="generate-report-btn">Generate Report</button>
+      <span class="report-generate-status" id="report-generate-status"></span>
+    </div>
+    ${
+      reports.length
+        ? `<table class="data-table">
+      <thead><tr><th>Day</th><th>Title</th><th>Articles</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`
+        : '<p class="admin-empty">No reports yet — one is generated automatically every day at 04:23 UTC for the previous day.</p>'
+    }`;
+}
+
+async function generateReport(date, force) {
+  const status = document.getElementById('report-generate-status');
+  status.textContent = `Generating ${date || 'yesterday'}… (this takes ~30s)`;
+  try {
+    const result = await apiPost('/admin/reports/generate', { date: date || undefined, force }, state.token);
+    if (result.status === 'skipped') {
+      status.textContent = `Skipped ${result.date}: only ${result.articleCount} articles that day.`;
+      return;
+    }
+    if (result.status === 'exists') {
+      status.textContent = `${result.date} already has a report — use Regenerate to replace it.`;
+      return;
+    }
+    await renderAdmin();
+  } catch (err) {
+    console.error('Failed to generate report', err);
+    status.textContent = 'Failed — see console';
+  }
+}
+
+function wireReportActions() {
+  const dateInput = document.getElementById('report-date');
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  dateInput.value = yesterday;
+  dateInput.max = yesterday;
+
+  const generateBtn = document.getElementById('generate-report-btn');
+  generateBtn.addEventListener('click', () => {
+    generateBtn.disabled = true;
+    generateReport(dateInput.value, false).finally(() => {
+      generateBtn.disabled = false;
+    });
+  });
+
+  document.querySelectorAll('[data-regen-report]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      generateReport(btn.dataset.regenReport, true).finally(() => {
+        btn.disabled = false;
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-delete-report]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Delete the report for ${btn.dataset.deleteReport}?`)) return;
+      btn.disabled = true;
+      try {
+        await apiDelete(`/admin/reports/${btn.dataset.deleteReport}`, {}, state.token);
+        renderAdmin();
+      } catch (err) {
+        console.error('Failed to delete report', err);
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 async function renderAdmin() {
   mainEl().innerHTML = `
     <section class="admin-section">
@@ -156,6 +247,14 @@ async function renderAdmin() {
 
     <section class="admin-section">
       <div class="admin-section-header">
+        <span class="admin-section-title">Daily Reports</span>
+        <a class="btn-ghost" href="/reports" target="_blank" rel="noopener">View public page</a>
+      </div>
+      <div id="reports-container">Loading&hellip;</div>
+    </section>
+
+    <section class="admin-section">
+      <div class="admin-section-header">
         <span class="admin-section-title">Topics</span>
         <button type="button" class="btn-primary" id="add-topic-btn">+ Add Topic</button>
       </div>
@@ -171,19 +270,22 @@ async function renderAdmin() {
     </section>
   `;
 
-  const [statsHtml, failedHtml, topicsHtml, sourcesHtml] = await Promise.all([
+  const [statsHtml, failedHtml, reportsHtml, topicsHtml, sourcesHtml] = await Promise.all([
     loadStats(),
     loadFailedIngestions(),
+    loadReports(),
     loadTopics(),
     loadSources(),
   ]);
   document.getElementById('stats-container').innerHTML = statsHtml;
   document.getElementById('failed-container').innerHTML = failedHtml;
+  document.getElementById('reports-container').innerHTML = reportsHtml;
   document.getElementById('topics-container').innerHTML = topicsHtml;
   document.getElementById('sources-container').innerHTML = sourcesHtml;
 
   wireTopicActions();
   wireSourceActions();
+  wireReportActions();
   wireCronButton();
   wireFailedIngestionActions();
 }

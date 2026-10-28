@@ -11,8 +11,24 @@ import { state, notify } from './state.js';
 // crashes ("Ak.Timer is not a constructor") the moment it picks that
 // stale global up. The import map sidesteps that entirely by giving
 // both libraries the exact same modern, ESM-only Three.js build.
-import ForceGraph3D from 'https://esm.sh/3d-force-graph?external=three';
-import SpriteText from 'https://esm.sh/three-spritetext?external=three';
+//
+// Loaded lazily (load3DLibs) on first use of the 3D keyword network rather
+// than as top-level imports: a static import failing (CDN hiccup, a broken
+// upstream release) took down app.js and the whole dashboard with it, and
+// it made every visitor — most of them on mobile, most never opening the
+// 3D view — download Three.js up front.
+let ForceGraph3D;
+let SpriteText;
+
+async function load3DLibs() {
+  if (ForceGraph3D) return;
+  const [fg, st] = await Promise.all([
+    import('https://esm.sh/3d-force-graph?external=three'),
+    import('https://esm.sh/three-spritetext?external=three'),
+  ]);
+  ForceGraph3D = fg.default;
+  SpriteText = st.default;
+}
 
 let cy; // Cytoscape instance — 2D relation graph
 let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)
@@ -333,6 +349,13 @@ async function renderKeywordNetwork(keyword) {
     data.nodes.filter((n) => n.type === 'article').map((n) => n.id),
     keyword
   );
+
+  try {
+    await load3DLibs();
+  } catch (err) {
+    console.error('Failed to load 3D graph libraries', err);
+    return;
+  }
 
   const graph = getGraph3D();
   graph.graphData({

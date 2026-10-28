@@ -34,3 +34,11 @@ export const MAX_RELATIONS_PER_ARTICLE = 20;
 // Max queued articles per OpenAI batch submission; the rest go in the next
 // batch once this one finishes.
 export const MAX_BATCH_SIZE = 500;
+// Daily report (pipeline/daily-report.js): runs once a day for the
+// previous UTC day. 04:23 UTC leaves the batch pipeline a few hours to
+// finish processing the day's late articles first.
+export const DAILY_REPORT_CRON = '23 4 * * *';
+export const DAILY_REPORT_MAX_ARTICLES = 120;
+export const DAILY_REPORT_MIN_ARTICLES = 5;
+export const SITE_NAME = 'Apollon';
+export const SITE_TAGLINE = 'World Intelligence Dashboard';

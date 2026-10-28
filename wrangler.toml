@@ -8,9 +8,10 @@ enabled = true
 invocation_logs = true
 
 [triggers]
-# The second entry is the daily retention job — must match RETENTION_CRON
-# in src/lib/constants.js (src/worker.js dispatches on it).
-crons = ["*/5 * * * *", "17 3 * * *"]
+# Entries after the first are the daily retention job and the daily
+# report — they must match RETENTION_CRON / DAILY_REPORT_CRON in
+# src/lib/constants.js (src/worker.js dispatches on them).
+crons = ["*/5 * * * *", "17 3 * * *", "23 4 * * *"]
 
 # Serves frontend/ directly from this Worker (no separate Pages project).
 # Requests matching a real file in frontend/ are served directly; anything
@@ -33,6 +34,8 @@ index_name = "wid-articles"
 [vars]
 ENVIRONMENT = "production"
 ADMIN_EMAIL = "kkourentzes@gmail.com"
+# Canonical origin for SEO URLs (canonical links, sitemap, Open Graph).
+SITE_URL = "https://apollon.talosat.work"
 
 # Secrets — set via: wrangler secret put SECRET_NAME
 # OPENAI_API_KEY

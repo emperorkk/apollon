@@ -1,0 +1,549 @@
+/* ==========================================================================
+   Daily report pages (server-rendered by src/web/). Same HUD palette as the
+   dashboard (main.css), but laid out for long-form reading: normal document
+   scrolling, a ~70ch measure, larger body text. Mobile-first.
+   ========================================================================== */
+
+:root {
+  --bg: #04070a;
+  --bg-elevated: #070b10;
+  --panel: #0d1218;
+  --border: #1b232d;
+  --border-strong: #29333f;
+  --text: #dce4eb;
+  --text-dim: #9aa8b6;
+  --text-faint: #6b7988;
+  --accent: #4fd8e8;
+  --accent-strong: #8fecf7;
+  --accent-soft: rgba(79, 216, 232, 0.12);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  --radius: 2px;
+  --gutter: 16px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 72px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 10;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+}
+
+.skip-link:focus {
+  left: 8px;
+}
+
+/* --- Header -------------------------------------------------------------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 var(--gutter);
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+  height: 56px;
+  background: rgba(7, 11, 16, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
+.brand:hover {
+  text-decoration: none;
+  color: var(--text);
+}
+
+.brand-mark {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-soft);
+  font-size: 14px;
+}
+
+.brand-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.site-nav a {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 10px 8px;
+  white-space: nowrap;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* --- Page ---------------------------------------------------------------- */
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px var(--gutter) 48px;
+}
+
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 20px;
+}
+
+.breadcrumbs a {
+  color: var(--text-dim);
+}
+
+.page-header {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: clamp(28px, 6vw, 40px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: clamp(20px, 4.4vw, 24px);
+  line-height: 1.3;
+  font-weight: 650;
+}
+
+p {
+  margin: 0 0 16px;
+}
+
+.lead {
+  font-size: 19px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+}
+
+/* --- Share bar ----------------------------------------------------------- */
+
+.share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.share-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-right: 4px;
+}
+
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.share-btn:hover,
+.share-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.share-btn[hidden] {
+  display: none;
+}
+
+.share-native {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.share-copy.copied {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-soft);
+}
+
+/* --- Report body ----------------------------------------------------------- */
+
+.key-points,
+.toc {
+  margin: 0 0 32px;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.key-points h2,
+.toc h2,
+.report-sources h2 {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.key-points ul,
+.toc ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.key-points li + li,
+.toc li + li {
+  margin-top: 8px;
+}
+
+.toc {
+  border-left-color: var(--border-strong);
+  font-size: 15px;
+}
+
+.report-section {
+  margin: 0 0 36px;
+}
+
+.section-sources {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.section-sources a {
+  margin-right: 2px;
+}
+
+.tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 32px;
+  padding: 0;
+}
+
+.tags li {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.report-sources {
+  margin: 0 0 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.report-sources ol {
+  margin: 0;
+  padding-left: 24px;
+}
+
+.report-sources li {
+  margin-bottom: 8px;
+}
+
+.report-sources li:target {
+  background: var(--accent-soft);
+}
+
+.source-outlet {
+  color: var(--text-faint);
+}
+
+.report-footer {
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.adjacent {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 28px 0;
+}
+
+.adjacent a {
+  display: block;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.adjacent a:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.adjacent a span {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+@media (min-width: 640px) {
+  .adjacent {
+    grid-template-columns: 1fr 1fr;
+  }
+  .adjacent a[rel='next'] {
+    text-align: right;
+  }
+}
+
+.cta {
+  text-align: center;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.btn:hover {
+  text-decoration: none;
+  box-shadow: 0 0 14px var(--accent-soft);
+}
+
+/* --- Archive ------------------------------------------------------------- */
+
+.report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.report-item a {
+  display: block;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.report-item a:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.report-item time,
+.report-item-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.report-item h2 {
+  margin: 6px 0 8px;
+  font-size: 20px;
+}
+
+.report-item p {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.report-item-meta {
+  color: var(--text-faint);
+}
+
+.report-empty {
+  padding: 24px;
+  color: var(--text-dim);
+  border: 1px dashed var(--border-strong);
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* --- Footer -------------------------------------------------------------- */
+
+.site-footer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) calc(32px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+@media (max-width: 420px) {
+  body {
+    font-size: 16px;
+  }
+  .lead {
+    font-size: 17px;
+  }
+  .site-nav a[href$='rss.xml'] {
+    display: none;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .site-header,
+  .share,
+  .adjacent,
+  .cta,
+  .site-footer {
+    display: none;
+  }
+}
