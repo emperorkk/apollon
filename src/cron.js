@@ -5,6 +5,7 @@ import { geocodeArticle } from './pipeline/geocode.js';
 import { embedArticle } from './pipeline/embed.js';
 import { computeRelations } from './pipeline/relate.js';
 import { maybeNotify } from './pipeline/notify.js';
+import { checkAndAlert } from './pipeline/health.js';
 import { MAX_FINALIZE_PER_RUN, MAX_BATCH_SIZE } from './lib/constants.js';
 
 const RESULT_UPDATE_CHUNK = 100;
@@ -294,6 +295,8 @@ async function finalizeReadyArticles(env, db) {
 // (spec §7.7).
 export async function runCron(env) {
   const db = env.DB;
+
+  await checkAndAlert(env);
 
   const { meta } = await db.prepare("INSERT INTO cron_runs (status) VALUES ('running')").run();
   const runId = meta.last_row_id;

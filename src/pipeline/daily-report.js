@@ -3,9 +3,12 @@ import {
   DAILY_REPORT_MAX_ARTICLES,
   DAILY_REPORT_MIN_ARTICLES,
 } from '../lib/constants.js';
+import { notifyAll } from './notify.js';
+import { previousAthensDay, athensDayBoundsUtc } from '../lib/time.js';
+import { macroRegionsFor, MACRO_REGION_SLUGS } from '../lib/regions.js';
 
 // Daily report (separate cron trigger, see wrangler.toml): once a day,
-// collect the previous UTC day's articles and have GPT write one
+// collect the previous Athens calendar day's articles and have GPT write one
 // structured briefing from them. Unlike per-article processing this is a
 // single live chat-completion call, so it doesn't go through the Batch API.
 
@@ -14,16 +17,21 @@ const SYSTEM_PROMPT =
   'Write only from the articles provided; never add facts, numbers or quotes that are not in them. ' +
   'Respond ONLY with valid JSON. No markdown, no code fences.';
 
-export function previousUtcDay(now = new Date()) {
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
-  return d.toISOString().slice(0, 10);
-}
+
+// Greek → Latin (ELOT-style, simplified) so Greek titles and place names
+// produce readable URL slugs instead of being stripped to nothing.
+const GREEK_TO_LATIN = {
+  α: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'i', θ: 'th', ι: 'i', κ: 'k', λ: 'l', μ: 'm',
+  ν: 'n', ξ: 'x', ο: 'o', π: 'p', ρ: 'r', σ: 's', ς: 's', τ: 't', υ: 'y', φ: 'f', χ: 'ch', ψ: 'ps', ω: 'o',
+};
 
 export function slugify(text) {
   const slug = text
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/ου/g, 'ou')
+    .replace(/[α-ω]/g, (ch) => GREEK_TO_LATIN[ch] ?? '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
   // Cut long slugs at a word boundary rather than mid-word.
@@ -31,8 +39,7 @@ export function slugify(text) {
 }
 
 async function loadDayArticles(db, date) {
-  const start = `${date}T00:00:00.000Z`;
-  const end = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+  const [start, end] = athensDayBoundsUtc(date);
 
   const { results } = await db
     .prepare(
@@ -58,7 +65,7 @@ function buildPrompt(date, articles) {
     return `[${i}] (${a.importance}/10; ${a.topics || 'General'}; ${a.place || 'n/a'}; ${a.source_name || 'unknown'}) ${title}${summary ? ` — ${summary}` : ''}`;
   });
 
-  return `Write the daily world-news briefing for ${date} (UTC) from the ${articles.length} articles below,
+  return `Write the daily world-news briefing for ${date} (Athens time) from the ${articles.length} articles below,
 ordered by importance. Group related stories into themed sections, most important first. Return a JSON
 object with exactly these fields:
 {
@@ -74,14 +81,15 @@ object with exactly these fields:
     }
   ],
   "keywords":    string[], // 6-12 search keywords/phrases (people, places, events)
-  "regions":     string[]  // 3-8 countries/regions most covered
+  "regions":     string[], // 3-8 countries/regions most covered, in English
+  "macro_regions": string[] // which of ${JSON.stringify(MACRO_REGION_SLUGS)} the day's stories materially concern (may be empty)
 }
 
 Articles:
 ${lines.join('\n')}`;
 }
 
-async function callOpenAI(env, prompt) {
+async function callOpenAI(env, prompt, systemPrompt = SYSTEM_PROMPT) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -91,7 +99,7 @@ async function callOpenAI(env, prompt) {
     body: JSON.stringify({
       model: OPENAI_CHAT_MODEL,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
@@ -109,7 +117,7 @@ const asStrings = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === 'strin
 
 // Generates (or, with force, regenerates) the report for `date`. Returns
 // { status: 'created' | 'exists' | 'skipped', ... }.
-export async function generateDailyReport(env, date = previousUtcDay(), { force = false } = {}) {
+export async function generateDailyReport(env, date = previousAthensDay(), { force = false } = {}) {
   const db = env.DB;
 
   if (!force) {
@@ -167,19 +175,20 @@ export async function generateDailyReport(env, date = previousUtcDay(), { force 
     keywords: JSON.stringify(asStrings(gpt.keywords)),
     sources: JSON.stringify(sources),
     regions: JSON.stringify(asStrings(gpt.regions)),
+    macro_regions: JSON.stringify(macroRegionsFor(asStrings(gpt.regions), asStrings(gpt.macro_regions))),
     article_count: articles.length,
   };
 
   await db
     .prepare(
       `INSERT INTO daily_reports
-         (report_date, slug, title, description, summary, key_points, sections, keywords, sources, regions, article_count)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (report_date, slug, title, description, summary, key_points, sections, keywords, sources, regions, macro_regions, article_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(report_date) DO UPDATE SET
          slug = excluded.slug, title = excluded.title, description = excluded.description,
          summary = excluded.summary, key_points = excluded.key_points, sections = excluded.sections,
          keywords = excluded.keywords, sources = excluded.sources, regions = excluded.regions,
-         article_count = excluded.article_count, updated_at = datetime('now')`
+         macro_regions = excluded.macro_regions, article_count = excluded.article_count, updated_at = datetime('now')`
     )
     .bind(
       report.report_date,
@@ -192,10 +201,138 @@ export async function generateDailyReport(env, date = previousUtcDay(), { force 
       report.keywords,
       report.sources,
       report.regions,
+      report.macro_regions,
       report.article_count
     )
     .run();
 
   console.log(`[daily-report] ${date}: created "${title}" from ${articles.length} articles`);
-  return { status: 'created', date, slug: report.slug, articleCount: articles.length };
+
+  // The Greek version is a separate call so a translation failure never
+  // loses the English report; ensureTranslations() retries it daily.
+  const translated = await translateReport(env, date, 'el').then(
+    () => true,
+    (err) => {
+      console.error(`[daily-report] ${date}: Greek translation failed: ${err.message}`);
+      return false;
+    }
+  );
+
+  return { status: 'created', date, slug: report.slug, title, articleCount: articles.length, translated };
+}
+
+// --- Translation ------------------------------------------------------------
+
+const TRANSLATION_SYSTEM_PROMPT =
+  'You are a professional news translator. Translate faithfully into natural, journalistic Modern Greek. ' +
+  'Do not add, remove or reinterpret facts. Respond ONLY with valid JSON. No markdown, no code fences.';
+
+const LANGUAGE_NAMES = { el: 'Modern Greek' };
+
+function buildTranslationPrompt(lang, report) {
+  const source = {
+    title: report.title,
+    description: report.description,
+    summary: report.summary,
+    key_points: JSON.parse(report.key_points),
+    sections: JSON.parse(report.sections).map((s) => ({ heading: s.heading, paragraphs: s.paragraphs })),
+    keywords: JSON.parse(report.keywords),
+    regions: JSON.parse(report.regions || '[]'),
+  };
+  return `Translate this daily news report JSON into ${LANGUAGE_NAMES[lang]}. Return JSON with exactly the same
+structure, keys and array lengths (same number of key_points, sections, paragraphs per section, keywords and
+regions, in the same order). Use the standard ${LANGUAGE_NAMES[lang]} names for countries, people and
+organisations. Keep "title" 50-70 characters and "description" 140-160 characters.
+
+${JSON.stringify(source)}`;
+}
+
+// Translates the stored English report for `date` and upserts it into
+// daily_report_translations. Section source citations are copied from the
+// English sections by position.
+export async function translateReport(env, date, lang = 'el') {
+  const db = env.DB;
+  const report = await db.prepare('SELECT * FROM daily_reports WHERE report_date = ?').bind(date).first();
+  if (!report) throw new Error(`no report for ${date}`);
+
+  const gpt = await callOpenAI(env, buildTranslationPrompt(lang, report), TRANSLATION_SYSTEM_PROMPT);
+  const english = JSON.parse(report.sections);
+  const translated = Array.isArray(gpt.sections) ? gpt.sections : [];
+  if (!gpt.title || translated.length !== english.length) {
+    throw new Error(`translation shape mismatch (${translated.length} vs ${english.length} sections)`);
+  }
+
+  const sections = english.map((s, i) => {
+    const paragraphs = asStrings(translated[i]?.paragraphs);
+    return {
+      heading: String(translated[i]?.heading ?? '').trim() || s.heading,
+      paragraphs: paragraphs.length ? paragraphs : s.paragraphs,
+      sources: s.sources,
+    };
+  });
+
+  const title = String(gpt.title).trim();
+  await db
+    .prepare(
+      `INSERT INTO daily_report_translations
+         (report_date, lang, slug, title, description, summary, key_points, sections, keywords, regions)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(report_date, lang) DO UPDATE SET
+         slug = excluded.slug, title = excluded.title, description = excluded.description,
+         summary = excluded.summary, key_points = excluded.key_points, sections = excluded.sections,
+         keywords = excluded.keywords, regions = excluded.regions, updated_at = datetime('now')`
+    )
+    .bind(
+      date,
+      lang,
+      slugify(title) || date,
+      title,
+      String(gpt.description ?? '').trim().slice(0, 300),
+      String(gpt.summary ?? '').trim(),
+      JSON.stringify(asStrings(gpt.key_points)),
+      JSON.stringify(sections),
+      JSON.stringify(asStrings(gpt.keywords)),
+      JSON.stringify(asStrings(gpt.regions))
+    )
+    .run();
+  console.log(`[daily-report] ${date}: ${lang} translation saved ("${title}")`);
+}
+
+// Backfills Greek translations missing from recent reports (a failed
+// translation, or reports created before translations existed). Bounded
+// so one daily run can't turn into dozens of OpenAI calls.
+export async function ensureTranslations(env, lang = 'el', limit = 3) {
+  const { results } = await env.DB.prepare(
+    `SELECT r.report_date FROM daily_reports r
+     LEFT JOIN daily_report_translations t ON t.report_date = r.report_date AND t.lang = ?
+     WHERE t.report_date IS NULL ORDER BY r.report_date DESC LIMIT ?`
+  )
+    .bind(lang, limit)
+    .all();
+  let done = 0;
+  for (const { report_date: date } of results) {
+    try {
+      await translateReport(env, date, lang);
+      done += 1;
+    } catch (err) {
+      console.error(`[daily-report] ${date}: ${lang} backfill failed: ${err.message}`);
+    }
+  }
+  return done;
+}
+
+// Push notification to every subscriber when the scheduled report is
+// published (not on admin regenerations, to avoid repeat pings).
+export async function notifyDailyReport(env, result) {
+  const day = new Date(`${result.date}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  const sent = await notifyAll(env, {
+    title: `Daily report — ${day}`,
+    body: result.title,
+    url: `/reports/${result.date}/${result.slug}`,
+  });
+  console.log(`[daily-report] ${result.date}: notified ${sent} subscribers`);
 }

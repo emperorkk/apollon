@@ -86,19 +86,40 @@ Authorized JavaScript origins. The client ID is not secret — put it in
 
 ## Scheduled jobs & public pages
 
-Three cron triggers (`wrangler.toml`), dispatched in `src/worker.js`:
+All user-facing dates and times are **Athens time** (Europe/Athens); the
+cron schedules themselves are UTC. Three cron triggers (`wrangler.toml`),
+dispatched in `src/worker.js`:
 
 | Schedule (UTC) | Job | What it does |
 | --- | --- | --- |
-| every 5 min | `src/cron.js` | RSS ingest → OpenAI batch → finalize articles |
+| every 5 min | `src/cron.js` | Health check + alert, RSS ingest → OpenAI batch → finalize articles |
 | 03:17 daily | `src/pipeline/retention.js` | Deletes everything older than 30 days (articles + relations/topics/locations/entities, stale queue rows, old logs, Vectorize vectors) |
-| 04:23 daily | `src/pipeline/daily-report.js` | Writes one AI briefing for the previous UTC day into `daily_reports` (kept forever) |
+| 04:23 daily | `src/pipeline/daily-report.js` | Writes one AI briefing for the previous Athens day, translates it to Greek, pushes a notification to subscribers |
 
-Server-rendered, indexable pages (`src/web/`): `/reports` (archive),
-`/reports/:date/:slug` (one report, with share buttons, Open Graph and
-NewsArticle JSON-LD), `/reports/latest`, `/reports/rss.xml`, `/sitemap.xml`,
-`/robots.txt`. A report can also be generated or regenerated on demand from
-the admin console (Daily Reports section).
+Server-rendered, indexable pages (`src/web/`), in English and Greek (`/el/...`):
+`/reports` (archive), `/reports/:date/:slug` (one report: share buttons,
+Open Graph, NewsArticle JSON-LD, hreflang), `/reports/:date/og.png`
+(per-report preview image, `src/og/`), `/reports/region/:slug` (hubs for
+`europe`, `balkans`, `mediterranean`, `east-med` — `src/lib/regions.js`),
+`/reports/latest`, `/reports/rss.xml`, `/sitemap.xml`, `/robots.txt`.
+Reports can be generated, regenerated and translated on demand from the admin
+console.
+
+### Monitoring
+
+`GET /api/health` returns pipeline health (`ok` / `degraded` / `down`, 503
+when down) — point an uptime monitor at it. The 5-minute cron also sends a
+push notification to the admin's subscribed devices when ingestion stalls (at
+most every 6 hours per problem); enable NOTIFY on the dashboard to receive it.
+
+### Caching
+
+Workers Caching (`[cache]` in `wrangler.toml`) answers repeat GETs from
+Cloudflare's cache without running the Worker — no CPU time and no D1 reads.
+`src/lib/cache-policy.js` sets an explicit `Cache-Control` on every response
+(public API: 2–10 min, report pages: 1–24 h, images: 7 days, everything else
+`no-store`); report pages are purged by tag when a report is (re)generated.
+The browser side has a service worker (`frontend/sw.js`) for offline use.
 
 ## Local development
 

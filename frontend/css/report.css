@@ -146,6 +146,14 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.site-nav .lang-switch {
+  color: var(--accent);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-left: 4px;
+}
+
 .site-nav a:hover {
   color: var(--accent);
   text-decoration: none;
@@ -444,6 +452,43 @@ p {
   box-shadow: 0 0 14px var(--accent-soft);
 }
 
+.tags-links li {
+  padding: 0;
+}
+
+.tags-links li > span,
+.tags-links a {
+  display: inline-block;
+  padding: 4px 9px;
+}
+
+.tags-links a {
+  color: var(--accent);
+}
+
+.tags-links a:hover {
+  text-decoration: none;
+  background: var(--accent-soft);
+}
+
+.tags-links a span {
+  color: var(--text-faint);
+  margin-left: 4px;
+}
+
+.region-nav {
+  margin: 0 0 28px;
+}
+
+.region-nav h2 {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 /* --- Archive ------------------------------------------------------------- */
 
 .report-list {
@@ -522,6 +567,13 @@ p {
   color: var(--text-faint);
 }
 
+@media (max-width: 480px) {
+  /* The logo already links to the live map. */
+  .site-nav a:first-child {
+    display: none;
+  }
+}
+
 @media (max-width: 420px) {
   body {
     font-size: 16px;
@@ -529,7 +581,7 @@ p {
   .lead {
     font-size: 17px;
   }
-  .site-nav a[href$='rss.xml'] {
+  .site-nav .nav-rss {
     display: none;
   }
 }

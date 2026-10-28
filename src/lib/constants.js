@@ -18,8 +18,9 @@ export const BATCH_COMPLETION_WINDOW = '24h';
 // before it reaches the final "mark as success" update (leaving cron_runs
 // stuck at 'running'). Kept small so a tick reliably finishes; leftovers
 // just finish on later ticks, which is fine since ingestion isn't
-// time-critical.
-export const MAX_FINALIZE_PER_RUN = 5;
+// time-critical. 15 on Workers Paid (scheduled runs may take up to 15
+// minutes, and D1 allows 1000 queries per invocation); it was 5 on Free.
+export const MAX_FINALIZE_PER_RUN = 15;
 // Daily retention job (pipeline/retention.js): everything older than this
 // is deleted — articles plus their relations/topics/locations/entities,
 // stale pending articles, and old cron/batch bookkeeping rows.
@@ -35,10 +36,18 @@ export const MAX_RELATIONS_PER_ARTICLE = 20;
 // batch once this one finishes.
 export const MAX_BATCH_SIZE = 500;
 // Daily report (pipeline/daily-report.js): runs once a day for the
-// previous UTC day. 04:23 UTC leaves the batch pipeline a few hours to
-// finish processing the day's late articles first.
+// previous Athens calendar day. Cron is UTC: 04:23 UTC is 06:23 (winter) /
+// 07:23 (summer) in Athens, a few hours after the Athens day ended, which
+// gives the batch pipeline time to finish processing late articles.
 export const DAILY_REPORT_CRON = '23 4 * * *';
 export const DAILY_REPORT_MAX_ARTICLES = 120;
 export const DAILY_REPORT_MIN_ARTICLES = 5;
 export const SITE_NAME = 'Apollon';
 export const SITE_TAGLINE = 'World Intelligence Dashboard';
+// Pipeline health (pipeline/health.js, GET /api/health). The ingest cron
+// runs every 5 minutes, so no successful run for 30 minutes means it is
+// failing or not running; OpenAI batches normally finish within hours.
+export const HEALTH_CRON_STALE_MINUTES = 30;
+export const HEALTH_BATCH_STALE_HOURS = 26;
+export const HEALTH_REPORT_STALE_HOURS = 52;
+export const HEALTH_ALERT_COOLDOWN_HOURS = 6;

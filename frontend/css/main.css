@@ -1430,3 +1430,55 @@ dialog::backdrop {
     white-space: nowrap;
   }
 }
+
+.health-banner {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #3ecf8e;
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.health-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  color: #3ecf8e;
+}
+
+.health-banner ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.health-banner.health-degraded {
+  border-left-color: #f2c14e;
+}
+.health-banner.health-degraded strong {
+  color: #f2c14e;
+}
+.health-banner.health-down {
+  border-left-color: var(--danger);
+}
+.health-banner.health-down strong {
+  color: var(--danger);
+}
+
+.offline-banner {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #04070a;
+  background: #f2c14e;
+}
+
+.offline-banner[hidden] {
+  display: none;
+}

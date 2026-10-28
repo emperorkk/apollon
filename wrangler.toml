@@ -3,6 +3,19 @@ main = "src/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Workers Caching: repeat GETs are answered from Cloudflare's cache without
+# running the Worker (no CPU, no D1 reads). What gets cached and for how
+# long is decided per path by src/lib/cache-policy.js via Cache-Control.
+[cache]
+enabled = true
+
+# Fonts and the logo are bundled into the Worker for the per-report Open
+# Graph images (src/og/report-image.js).
+[[rules]]
+type = "Data"
+globs = ["**/*.woff", "**/*.png"]
+fallthrough = true
+
 [observability.logs]
 enabled = true
 invocation_logs = true

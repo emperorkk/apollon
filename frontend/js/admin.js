@@ -1,7 +1,7 @@
 import { ADMIN_EMAIL } from './config.js';
 import { state } from './state.js';
 import { apiGet, apiPost, apiPut, apiDelete } from './api.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, formatAthens, athensYesterday } from './utils.js';
 
 const mainEl = () => document.getElementById('admin-main');
 
@@ -33,12 +33,28 @@ async function loadStats() {
     ['Push Subscribers', stats.push_subscriber_count],
     ['Failed Geocodes (24h)', stats.failed_geocoding_count_24h],
     ['Last Cron Status', lastRun?.status ?? 'never run'],
-    ['Last Cron Run', lastRun ? new Date(lastRun.started_at).toLocaleString() : '—'],
+    ['Last Cron Run', lastRun ? formatAthens(lastRun.started_at) : '—'],
     ['Pending Articles', pendingSummary],
     ['Last Batch Job', lastBatch ? `${lastBatch.status}` : 'none yet'],
   ];
 
-  return `<div class="stat-grid">${tiles
+  // Plain fetch: /api/health answers 503 when the pipeline is down, which
+  // apiGet would turn into an exception instead of showing the problems.
+  const health = await fetch('/api/health')
+    .then((res) => res.json())
+    .catch(() => null);
+  const healthHtml = health
+    ? `<div class="health-banner health-${health.status}">
+        <strong>Pipeline ${escapeHtml(health.status.toUpperCase())}</strong>
+        ${
+          health.problems?.length
+            ? `<ul>${health.problems.map((p) => `<li>${escapeHtml(p.message)}</li>`).join('')}</ul>`
+            : '<span>All checks passing. Enable NOTIFY on the dashboard to get push alerts if this changes.</span>'
+        }
+      </div>`
+    : '';
+
+  return `${healthHtml}<div class="stat-grid">${tiles
     .map(([label, value]) => `<div class="stat-tile"><span class="stat-tile-label">${label}</span><span class="stat-tile-value">${value}</span></div>`)
     .join('')}</div>`;
 }
@@ -62,7 +78,7 @@ async function loadFailedIngestions() {
       <td><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.title_orig || p.guid)}</a></td>
       <td>${escapeHtml(p.source_name ?? p.source_id ?? '')}</td>
       <td>${formatPendingError(p)}</td>
-      <td>${new Date(p.created_at).toLocaleString()}</td>
+      <td>${formatAthens(p.created_at)}</td>
       <td>
         <button type="button" class="btn-ghost" data-retry-pending="${p.id}">Retry</button>
         <button type="button" class="btn-ghost" data-discard-pending="${p.id}">Discard</button>
@@ -105,7 +121,7 @@ async function loadTopics() {
 
 function formatSourceError(s) {
   if (!s.last_error) return '<span class="card-placeholder">—</span>';
-  const when = s.last_error_at ? new Date(s.last_error_at).toLocaleString() : '';
+  const when = s.last_error_at ? formatAthens(s.last_error_at) : '';
   return `<span title="${escapeHtml(s.last_error)}">${escapeHtml(s.last_error.slice(0, 60))}${s.last_error.length > 60 ? '…' : ''}</span><br /><span class="stat-tile-label">${when}</span>`;
 }
 
@@ -144,6 +160,11 @@ async function loadReports() {
     <tr>
       <td>${escapeHtml(r.report_date)}</td>
       <td><a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></td>
+      <td>${
+        r.el
+          ? `<a href="${escapeHtml(r.el.url)}" target="_blank" rel="noopener">ΕΛ</a>`
+          : `<button type="button" class="btn-ghost" data-translate-report="${escapeHtml(r.report_date)}">Translate</button>`
+      }</td>
       <td>${r.article_count}</td>
       <td>
         <button type="button" class="btn-ghost" data-regen-report="${escapeHtml(r.report_date)}">Regenerate</button>
@@ -155,17 +176,17 @@ async function loadReports() {
 
   return `
     <div class="report-generate">
-      <label class="form-field" style="margin:0;"><span>Day (UTC)</span><input type="date" id="report-date" /></label>
+      <label class="form-field" style="margin:0;"><span>Day (Athens)</span><input type="date" id="report-date" /></label>
       <button type="button" class="btn-primary" id="generate-report-btn">Generate Report</button>
       <span class="report-generate-status" id="report-generate-status"></span>
     </div>
     ${
       reports.length
         ? `<table class="data-table">
-      <thead><tr><th>Day</th><th>Title</th><th>Articles</th><th></th></tr></thead>
+      <thead><tr><th>Day</th><th>Title</th><th>Greek</th><th>Articles</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`
-        : '<p class="admin-empty">No reports yet — one is generated automatically every day at 04:23 UTC for the previous day.</p>'
+        : '<p class="admin-empty">No reports yet — one is generated automatically every morning (~06:23–07:23 Athens time) for the previous Athens day.</p>'
     }`;
 }
 
@@ -191,7 +212,7 @@ async function generateReport(date, force) {
 
 function wireReportActions() {
   const dateInput = document.getElementById('report-date');
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const yesterday = athensYesterday();
   dateInput.value = yesterday;
   dateInput.max = yesterday;
 
@@ -209,6 +230,21 @@ function wireReportActions() {
       generateReport(btn.dataset.regenReport, true).finally(() => {
         btn.disabled = false;
       });
+    });
+  });
+
+  document.querySelectorAll('[data-translate-report]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Translating…';
+      try {
+        await apiPost(`/admin/reports/${btn.dataset.translateReport}/translate`, {}, state.token);
+        renderAdmin();
+      } catch (err) {
+        console.error('Failed to translate report', err);
+        btn.textContent = 'Failed';
+        btn.disabled = false;
+      }
     });
   });
 

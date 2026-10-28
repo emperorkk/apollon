@@ -149,7 +149,25 @@ function wireOverlayDismiss() {
   });
 }
 
+// Offline support (see sw.js): the service worker caches the app shell,
+// recent API responses and viewed map tiles; the banner tells the viewer
+// when they're looking at saved data.
+function initOffline() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.error('Service worker registration failed', err));
+  }
+  const banner = document.getElementById('offline-banner');
+  const update = () => {
+    banner.hidden = navigator.onLine;
+  };
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
+}
+
 async function bootstrap() {
+  initOffline();
+
   try {
     const { topics } = await apiGet('/topics');
     state.topics = topics;

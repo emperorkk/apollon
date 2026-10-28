@@ -29,10 +29,11 @@
           document.execCommand('copy');
           input.remove();
         }
-        copy.textContent = 'Copied!';
+        const label = copy.textContent;
+        copy.textContent = bar.dataset.copied || 'Copied!';
         copy.classList.add('copied');
         setTimeout(() => {
-          copy.textContent = 'Copy link';
+          copy.textContent = label;
           copy.classList.remove('copied');
         }, 2000);
       });

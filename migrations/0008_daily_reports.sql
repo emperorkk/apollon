@@ -1,4 +1,4 @@
--- One AI-written briefing per UTC day, summarising that day's articles
+-- One AI-written briefing per Athens calendar day, summarising that day's articles
 -- (src/pipeline/daily-report.js). Served as server-rendered, indexable
 -- pages at /reports/:date/:slug.
 --
@@ -8,7 +8,7 @@
 -- long-lived, linkable content.
 
 CREATE TABLE IF NOT EXISTS daily_reports (
-  report_date   TEXT PRIMARY KEY,   -- YYYY-MM-DD, the UTC day covered
+  report_date   TEXT PRIMARY KEY,   -- YYYY-MM-DD, the Athens calendar day covered
   slug          TEXT NOT NULL,      -- URL slug derived from the title
   title         TEXT NOT NULL,      -- <h1>/<title>, ~60 chars
   description   TEXT NOT NULL,      -- meta description, ~150 chars
