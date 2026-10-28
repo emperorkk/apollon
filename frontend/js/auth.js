@@ -31,7 +31,9 @@ function setupGsi() {
 async function handleCredential(response) {
   try {
     const { token } = await apiPost('/auth/google', { id_token: response.credential });
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    // JWT segments are base64url; atob needs standard base64 with padding.
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), '=')));
     setSession(token, { email: payload.email });
   } catch (err) {
     console.error('Google sign-in failed', err);
