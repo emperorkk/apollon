@@ -30,7 +30,7 @@ export const FINALIZE_TIME_BUDGET_MS = 4 * 60 * 1000;
 // stale pending articles, and old cron/batch bookkeeping rows.
 export const RETENTION_DAYS = 30;
 export const RETENTION_DELETE_CHUNK = 500;
-export const VECTORIZE_DELETE_CHUNK = 500;
+export const VECTORIZE_DELETE_CHUNK = 100;
 export const RETENTION_CRON = '17 3 * * *';
 // Hard cap on relations per article, counting both sides of the pair —
 // uncapped shared-entity matching ("United States", etc.) linked each new
