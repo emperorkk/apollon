@@ -83,10 +83,12 @@ export async function runRetention(env) {
   ]);
 
   let vectors = 0;
+  let vectorError = null;
   try {
     vectors = await drainVectorDeletions(env);
   } catch (err) {
     // Left queued in vector_deletions; retried on the next run.
+    vectorError = err.message;
     console.error(`[retention] Vectorize cleanup failed: ${err.message}`);
   }
 
@@ -96,7 +98,17 @@ export async function runRetention(env) {
     cronRuns: cronRuns.meta.changes,
     batchJobs: batchJobs.meta.changes,
     vectors,
+    vectorError,
   };
   console.log(`[retention] ${JSON.stringify(summary)}`);
+
+  // Last run's outcome, readable straight from D1 (app_state) without
+  // needing access to Worker logs.
+  await db
+    .prepare(
+      "INSERT INTO app_state (key, value, updated_at) VALUES ('retention:last', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+    )
+    .bind(JSON.stringify(summary))
+    .run();
   return summary;
 }
