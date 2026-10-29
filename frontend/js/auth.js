@@ -9,14 +9,23 @@ import { apiPost } from './api.js';
 // before initialize() has actually run.
 let gsiInitialized = false;
 
+// Google's sign-in script (~100 KB, mostly unused by visitors who never
+// sign in) is injected once the page is idle rather than loaded up front.
+function loadGsi() {
+  if (window.google?.accounts?.id) return setupGsi();
+  const script = document.createElement('script');
+  script.src = 'https://accounts.google.com/gsi/client';
+  script.async = true;
+  script.onload = setupGsi;
+  document.head.appendChild(script);
+}
+
 export function initAuth() {
   subscribe(renderAuthArea);
 
-  if (window.google?.accounts?.id) {
-    setupGsi();
-  } else {
-    window.addEventListener('load', setupGsi, { once: true });
-  }
+  const whenIdle = () => (window.requestIdleCallback ? requestIdleCallback(loadGsi, { timeout: 3000 }) : setTimeout(loadGsi, 1500));
+  if (document.readyState === 'complete') whenIdle();
+  else window.addEventListener('load', whenIdle, { once: true });
 
   renderAuthArea();
 }
