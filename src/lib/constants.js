@@ -24,7 +24,11 @@ export const BATCH_COMPLETION_WINDOW = '24h';
 // 5-minute cron interval, and skips finalizing while a previous tick is
 // still running (see cron.js).
 export const MAX_FINALIZE_PER_RUN = 50;
-export const FINALIZE_TIME_BUDGET_MS = 4 * 60 * 1000;
+// 3 minutes: fetching ~45 feeds takes up to a minute or so first, and the
+// whole tick has to fit in the 5-minute cron interval.
+export const FINALIZE_TIME_BUDGET_MS = 3 * 60 * 1000;
+// RSS items older than this are ignored at ingest (see pipeline/ingest.js).
+export const MAX_ITEM_AGE_DAYS = 3;
 // Daily retention job (pipeline/retention.js): everything older than this
 // is deleted — articles plus their relations/topics/locations/entities,
 // stale pending articles, and old cron/batch bookkeeping rows.
