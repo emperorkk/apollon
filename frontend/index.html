@@ -62,9 +62,10 @@
     }
   </script>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Leaflet 1.9.4 + MarkerCluster 1.5.3, self-hosted (frontend/vendor/) and
+       combined: one same-origin request instead of three to unpkg, which on
+       mobile meant an extra DNS + TLS handshake before first render. -->
+  <link rel="stylesheet" href="/vendor/leaflet-1.9.4/leaflet-bundle.css" />
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/map.css" />
@@ -279,10 +280,10 @@
     </div>
   </dialog>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="https://unpkg.com/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- defer: runs before the (also deferred) app module, in document order.
+       Cytoscape (relation graph) and Google sign-in are loaded on demand by
+       graph.js and auth.js instead of on every page view. -->
+  <script src="/vendor/leaflet-1.9.4/leaflet-bundle.js" defer></script>
 
   <script type="module" src="/js/app.js"></script>
 </body>

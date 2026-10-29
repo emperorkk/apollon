@@ -11,7 +11,7 @@
 //
 // Bump SW_VERSION with each release that changes precached files, so
 // clients pick up the new shell (old caches are deleted on activate).
-const SW_VERSION = 'v1.6.1';
+const SW_VERSION = 'v1.6.2';
 const SHELL_CACHE = `apollon-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = 'apollon-runtime';
 const TILE_CACHE = 'apollon-tiles';
@@ -42,6 +42,8 @@ const SHELL = [
   '/js/share.js',
   '/js/state.js',
   '/js/utils.js',
+  '/vendor/leaflet-1.9.4/leaflet-bundle.css',
+  '/vendor/leaflet-1.9.4/leaflet-bundle.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];

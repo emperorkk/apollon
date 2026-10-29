@@ -26,7 +26,9 @@ import { generateDailyReport, notifyDailyReport, ensureTranslations } from './pi
 import { RETENTION_CRON, DAILY_REPORT_CRON } from './lib/constants.js';
 import { cacheControlMiddleware, purgeCacheTag } from './lib/cache-policy.js';
 
-const app = new Hono();
+// strict: false — /api/health/ and /reports/ match the same routes as
+// /api/health and /reports instead of falling through to a 404.
+const app = new Hono({ strict: false });
 
 app.use('*', cacheControlMiddleware());
 app.use('/api/*', cors());
@@ -59,7 +61,7 @@ app.route('/', web);
 // in frontend/ (e.g. /article/:id from a push notification) — fall back to
 // the SPA shell so client-side code can handle it.
 app.notFound((c) => {
-  if (c.req.path.startsWith('/api/')) return c.json({ error: 'Not found' }, 404);
+  if (c.req.path.startsWith('/api/')) return c.json({ error: 'Not found', path: c.req.path }, 404);
   return c.env.ASSETS.fetch(new URL('/index.html', c.req.url));
 });
 

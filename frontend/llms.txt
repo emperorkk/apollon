@@ -1,0 +1,22 @@
+# Apollon — World Intelligence Dashboard
+
+> Apollon aggregates world news from hundreds of public RSS feeds, summarises each article with AI, places it on a live map, and publishes one AI-written daily report per day (Athens time) in English and Greek. Reports cite and link their original sources.
+
+## Daily reports
+
+- [Daily reports (English)](https://apollon.talosat.work/reports): archive of daily world news briefings, newest first
+- [Ημερήσιες αναφορές (Greek)](https://apollon.talosat.work/el/reports): the same reports in Greek
+- [Latest report](https://apollon.talosat.work/reports/latest)
+- [RSS feed](https://apollon.talosat.work/reports/rss.xml)
+
+## Regions
+
+- [Europe](https://apollon.talosat.work/reports/region/europe)
+- [Balkans](https://apollon.talosat.work/reports/region/balkans)
+- [Mediterranean](https://apollon.talosat.work/reports/region/mediterranean)
+- [Eastern Mediterranean](https://apollon.talosat.work/reports/region/east-med)
+
+## Optional
+
+- [Live map](https://apollon.talosat.work/): interactive dashboard (JavaScript app)
+- [Sitemap](https://apollon.talosat.work/sitemap.xml)

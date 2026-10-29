@@ -30,6 +30,24 @@ async function load3DLibs() {
   SpriteText = st.default;
 }
 
+// Cytoscape (~370 KB) is only needed once someone opens a relation graph,
+// so it's loaded then rather than on every page view.
+let cytoscapeLoading;
+function loadCytoscape() {
+  if (window.cytoscape) return Promise.resolve();
+  cytoscapeLoading ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/vendor/cytoscape-3.30.0/cytoscape.min.js';
+    script.onload = resolve;
+    script.onerror = () => {
+      cytoscapeLoading = null;
+      reject(new Error('Failed to load Cytoscape'));
+    };
+    document.head.appendChild(script);
+  });
+  return cytoscapeLoading;
+}
+
 let cy; // Cytoscape instance — 2D relation graph
 let graph3D; // ForceGraph3D instance — 3D keyword network (created once, reused)
 let currentArticleIds = [];
@@ -218,6 +236,13 @@ async function renderRelationGraph(rootId) {
   ];
 
   if (cy) cy.destroy();
+
+  try {
+    await loadCytoscape();
+  } catch (err) {
+    console.error(err);
+    return;
+  }
 
   cy = cytoscape({
     container: document.getElementById('graph-container'),
