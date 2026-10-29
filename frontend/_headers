@@ -8,3 +8,13 @@
 
 /og-image.png
   Cache-Control: public, max-age=86400
+
+# Baseline security headers for static assets (Worker responses get the
+# same set from src/lib/security-headers.js).
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()

@@ -1239,6 +1239,10 @@ dialog::backdrop {
   display: none;
 }
 
+.latest-report.is-loading {
+  visibility: hidden;
+}
+
 .latest-report:hover {
   border-color: var(--accent);
   box-shadow: 0 0 12px var(--accent-soft);
@@ -1308,6 +1312,8 @@ dialog::backdrop {
     overflow-y: hidden;
     align-items: center;
     padding: 8px 12px;
+    /* Same height loading ("Loading…") and loaded (a row of chips). */
+    min-height: 44px;
     scrollbar-width: none;
   }
   .keyword-list::-webkit-scrollbar {
@@ -1361,6 +1367,9 @@ dialog::backdrop {
     flex: 1 1 100%;
     margin: 0 -12px;
     padding: 0 12px;
+    /* Topics arrive from the API after first paint; reserving the row's
+       height keeps the map and feed from jumping down when they do. */
+    min-height: 34px;
   }
 
   /* 16px+ stops iOS Safari zooming the page when a field is focused. */

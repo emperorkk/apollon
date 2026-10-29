@@ -11,7 +11,9 @@ let clusterGroup;
 export function initMap(containerId) {
   map = L.map(containerId, { worldCopyJump: true, minZoom: 2 }).setView([20, 10], 2);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // Single host: OSM retired the a/b/c tile subdomains (HTTP/2 makes them
+  // pointless), and one origin lets index.html preconnect to it.
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18,
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
