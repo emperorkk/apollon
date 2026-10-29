@@ -1,6 +1,6 @@
 import Parser from 'rss-parser';
 import { getExistingGuids, recordSourceError, recordSourceSuccess } from '../lib/db.js';
-import { RSS_FETCH_TIMEOUT_MS, APP_USER_AGENT } from '../lib/constants.js';
+import { RSS_FETCH_TIMEOUT_MS, APP_USER_AGENT, MAX_ITEM_AGE_DAYS } from '../lib/constants.js';
 
 const parser = new Parser();
 
@@ -49,9 +49,16 @@ export async function fetchNewArticles(db, source) {
   const existingGuids = await getExistingGuids(db, guids);
 
   const fresh = [];
+  const oldest = Date.now() - MAX_ITEM_AGE_DAYS * 24 * 60 * 60 * 1000;
   for (const item of items) {
     const guid = item.guid || item.id || item.link;
     if (existingGuids.has(guid)) continue;
+
+    // Feeds often carry their archive (EIA's goes back to 2001); a newly
+    // added source would otherwise queue all of it for GPT. Undated items
+    // are kept and stamped with the fetch time below.
+    const published = Date.parse(item.isoDate || item.pubDate || '');
+    if (!Number.isNaN(published) && published < oldest) continue;
 
     const rawBody = item['content:encoded'] || item.content || item.contentSnippet || item.summary || '';
     const body = rawBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
