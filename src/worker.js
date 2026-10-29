@@ -25,11 +25,13 @@ import { runRetention } from './pipeline/retention.js';
 import { generateDailyReport, notifyDailyReport, ensureTranslations } from './pipeline/daily-report.js';
 import { RETENTION_CRON, DAILY_REPORT_CRON } from './lib/constants.js';
 import { cacheControlMiddleware, purgeCacheTag } from './lib/cache-policy.js';
+import { securityHeadersMiddleware } from './lib/security-headers.js';
 
 // strict: false — /api/health/ and /reports/ match the same routes as
 // /api/health and /reports instead of falling through to a 404.
 const app = new Hono({ strict: false });
 
+app.use('*', securityHeadersMiddleware());
 app.use('*', cacheControlMiddleware());
 app.use('/api/*', cors());
 
@@ -60,9 +62,16 @@ app.route('/', web);
 // Anything else reaching the Worker is a path with no matching static file
 // in frontend/ (e.g. /article/:id from a push notification) — fall back to
 // the SPA shell so client-side code can handle it.
-app.notFound((c) => {
+app.notFound(async (c) => {
   if (c.req.path.startsWith('/api/')) return c.json({ error: 'Not found', path: c.req.path }, 404);
-  return c.env.ASSETS.fetch(new URL('/index.html', c.req.url));
+  // The dashboard's only deep link (push notifications open /article/:id):
+  // serve the SPA shell, which opens that article's card.
+  if (/^\/article\/[^/]+$/.test(c.req.path)) return c.env.ASSETS.fetch(new URL('/', c.req.url));
+  // Everything else is a real 404 — previously every unknown URL returned
+  // the dashboard with status 200, which search engines treat as "soft 404"
+  // duplicates of the home page.
+  const page = await c.env.ASSETS.fetch(new URL('/404', c.req.url));
+  return new Response(page.body, { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 });
 
 export default {

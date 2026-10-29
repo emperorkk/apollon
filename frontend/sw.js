@@ -11,7 +11,7 @@
 //
 // Bump SW_VERSION with each release that changes precached files, so
 // clients pick up the new shell (old caches are deleted on activate).
-const SW_VERSION = 'v1.6.2';
+const SW_VERSION = 'v1.6.3';
 const SHELL_CACHE = `apollon-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = 'apollon-runtime';
 const TILE_CACHE = 'apollon-tiles';

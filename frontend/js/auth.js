@@ -9,24 +9,27 @@ import { apiPost } from './api.js';
 // before initialize() has actually run.
 let gsiInitialized = false;
 
-// Google's sign-in script (~100 KB, mostly unused by visitors who never
-// sign in) is injected once the page is idle rather than loaded up front.
+// Google's sign-in script (~100 KB, ~70% unused) is only loaded when a
+// visitor actually clicks "Sign in" — most never do, and loading it on
+// every page view cost mobile visitors blocking time and bandwidth.
+let gsiRequested = false;
 function loadGsi() {
   if (window.google?.accounts?.id) return setupGsi();
+  if (gsiRequested) return;
+  gsiRequested = true;
   const script = document.createElement('script');
   script.src = 'https://accounts.google.com/gsi/client';
   script.async = true;
-  script.onload = setupGsi;
+  script.onload = () => {
+    setupGsi();
+    // Offer the account chooser right away so one click is enough.
+    google.accounts.id.prompt();
+  };
   document.head.appendChild(script);
 }
 
 export function initAuth() {
   subscribe(renderAuthArea);
-
-  const whenIdle = () => (window.requestIdleCallback ? requestIdleCallback(loadGsi, { timeout: 3000 }) : setTimeout(loadGsi, 1500));
-  if (document.readyState === 'complete') whenIdle();
-  else window.addEventListener('load', whenIdle, { once: true });
-
   renderAuthArea();
 }
 
@@ -64,6 +67,14 @@ function renderAuthArea() {
   }
 
   pushToggle.hidden = true;
+  if (!gsiInitialized) {
+    area.innerHTML = '<button type="button" class="btn-ghost" id="sign-in-btn">SIGN IN</button>';
+    document.getElementById('sign-in-btn').addEventListener('click', (e) => {
+      e.currentTarget.textContent = 'LOADING…';
+      loadGsi();
+    });
+    return;
+  }
   area.innerHTML = '<div id="gsi-button"></div>';
   if (gsiInitialized) {
     google.accounts.id.renderButton(document.getElementById('gsi-button'), {

@@ -2,7 +2,7 @@ import { state, subscribe, notify } from './state.js';
 import { apiGet } from './api.js';
 import { initMap } from './map.js';
 import { initFeed } from './feed.js';
-import { closeArticleCard } from './card.js';
+import { closeArticleCard, openArticleCard } from './card.js';
 import { initAuth } from './auth.js';
 import { initPush } from './push.js';
 import { closeGraph } from './graph.js';
@@ -119,14 +119,24 @@ function wirePrivacyNotice() {
 // Surfaces the newest daily report above the feed (and gives crawlers that
 // do run JS a link into the report archive from the home page).
 async function renderLatestReport() {
+  // The banner's slot is reserved in the initial layout (.is-loading keeps
+  // it invisible but sized) so filling it in doesn't shift the feed — that
+  // shift was most of the page's Cumulative Layout Shift. Only when there
+  // is no report at all does it collapse.
+  const link = document.getElementById('latest-report');
   try {
     const { reports } = await apiGet('/reports?limit=1');
-    if (!reports.length) return;
-    const link = document.getElementById('latest-report');
+    if (!reports.length) {
+      link.hidden = true;
+      return;
+    }
     link.href = reports[0].url;
     document.getElementById('latest-report-title').textContent = reports[0].title;
-    link.hidden = false;
+    link.classList.remove('is-loading');
+    link.removeAttribute('aria-hidden');
+    link.removeAttribute('tabindex');
   } catch (err) {
+    link.hidden = true;
     console.error('Failed to load latest report', err);
   }
 }
@@ -165,6 +175,13 @@ function initOffline() {
   update();
 }
 
+// /article/:id (the link in topic-alert push notifications) opens that
+// article's card over the dashboard.
+function openDeepLinkedArticle() {
+  const match = window.location.pathname.match(/^\/article\/([^/]+)$/);
+  if (match) openArticleCard(decodeURIComponent(match[1]));
+}
+
 async function bootstrap() {
   initOffline();
 
@@ -192,6 +209,7 @@ async function bootstrap() {
   initPush();
   initKeywords('keyword-list');
   renderLatestReport();
+  openDeepLinkedArticle();
 
   subscribe(() => {});
 }

@@ -66,6 +66,8 @@
        combined: one same-origin request instead of three to unpkg, which on
        mobile meant an extra DNS + TLS handshake before first render. -->
   <link rel="stylesheet" href="/vendor/leaflet-1.9.4/leaflet-bundle.css" />
+  <!-- Map tiles are the largest paint on the page; open the connection early. -->
+  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/map.css" />
@@ -120,7 +122,7 @@
       <nav class="topic-filters" id="topic-filters" aria-label="Topic filters"></nav>
 
       <div class="search-wrap">
-        <input type="search" id="search-input" placeholder="SEARCH INTEL&hellip;" autocomplete="off" />
+        <input type="search" id="search-input" placeholder="SEARCH INTEL&hellip;" autocomplete="off" aria-label="Search news" />
       </div>
 
       <div class="header-actions">
@@ -149,11 +151,11 @@
           <div class="feed-toolbar">
             <div class="feed-count" id="feed-count">&mdash;</div>
             <button type="button" class="btn-ghost" id="clear-article-filter" hidden>&times; CLEAR FILTER</button>
-            <select id="region-filter" class="region-select">
+            <select id="region-filter" class="region-select" aria-label="Filter by region">
               <option value="">ALL REGIONS</option>
             </select>
           </div>
-          <a class="latest-report" id="latest-report" href="/reports" hidden>
+          <a class="latest-report is-loading" id="latest-report" href="/reports" aria-hidden="true" tabindex="-1">
             <span class="latest-report-label">DAILY REPORT</span>
             <span class="latest-report-title" id="latest-report-title"></span>
             <span class="latest-report-arrow" aria-hidden="true">&rarr;</span>
