@@ -157,12 +157,23 @@ function normalise(name) {
 
 // Macro-region slugs for a report, from GPT's own tagging plus the place
 // lookup over the countries it covers.
+//
+// GPT's tags win when present: it is asked to tag only regions a report
+// section is mainly about. The lookup is a fallback, and needs at least two
+// covered places in a region — otherwise a single place spanning several
+// hubs (Greece is in all four, and nearly every report mentions it) put
+// every report in every hub, making the hub pages identical.
+const MIN_PLACES_FOR_FALLBACK = 2;
+
 export function macroRegionsFor(places = [], tagged = []) {
-  const found = new Set(tagged.filter((slug) => MACRO_REGION_SLUGS.includes(slug)));
-  for (const place of places) {
-    for (const slug of PLACE_TO_MACRO[normalise(place)] ?? []) found.add(slug);
+  const fromModel = MACRO_REGION_SLUGS.filter((slug) => tagged.includes(slug));
+  if (fromModel.length) return fromModel;
+
+  const counts = new Map();
+  for (const place of new Set(places.map(normalise))) {
+    for (const slug of PLACE_TO_MACRO[place] ?? []) counts.set(slug, (counts.get(slug) ?? 0) + 1);
   }
-  return MACRO_REGION_SLUGS.filter((slug) => found.has(slug));
+  return MACRO_REGION_SLUGS.filter((slug) => (counts.get(slug) ?? 0) >= MIN_PLACES_FOR_FALLBACK);
 }
 
 // Compact label (chips, preview images); falls back to the full name.
