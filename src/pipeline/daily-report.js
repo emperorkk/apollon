@@ -82,7 +82,8 @@ object with exactly these fields:
   ],
   "keywords":    string[], // 6-12 search keywords/phrases (people, places, events)
   "regions":     string[], // 3-8 countries/regions most covered, in English
-  "macro_regions": string[] // which of ${JSON.stringify(MACRO_REGION_SLUGS)} the day's stories materially concern (may be empty)
+  "macro_regions": string[] // which of ${JSON.stringify(MACRO_REGION_SLUGS)} at least one section is MAINLY about
+                           // (a passing mention doesn't count; usually 1-2, may be empty)
 }
 
 Articles:
